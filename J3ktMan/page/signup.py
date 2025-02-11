@@ -8,9 +8,9 @@ def signup() -> rx.Component:
     return clerk.clerk_provider(
         rx.center(
             rx.vstack(
-                clerk.sign_in(
+                clerk.sign_up(
                     path="/signup",
-                    sign_up_url="/signin",
+                    sign_in_url="/signin",
                 ),
                 align="center",
                 spacing="7",
