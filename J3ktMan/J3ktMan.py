@@ -10,5 +10,7 @@ from J3ktMan.page.signin import signin
 app = rx.App()
 
 app.add_page(index)
-app.add_page(signin)
-app.add_page(signup)
+
+# for some reason, the @rx.page(route="...") decorator doesn't work so the route is added manually here :(
+app.add_page(signin, route="signin/[[...slug]]")
+app.add_page(signup, route="signup/[[...slug]]")
