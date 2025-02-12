@@ -1,6 +1,6 @@
 [project]
 dependencies = [
-    "reflex==0.6.8",
+    "reflex==0.7.0",
     "reflex-clerk @ git+https://github.com/Simmypeet/reflex-clerk@fix/signup",
     "authlib==1.3.2",
     "python-dotenv==1.0.1",
