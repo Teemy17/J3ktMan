@@ -57,7 +57,7 @@ function J3ktManProtected({ children }) {
             rx.cond(
                 ClerkState.is_signed_in,
                 rx.fragment(*children),
-                clerk.clerk_loading(),
+                rx.center(rx.spinner(size="3"), height="100vh"),
             ),
             **props,
         )
