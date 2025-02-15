@@ -6,9 +6,6 @@ from J3ktMan.page.index import index
 from J3ktMan.page.signup import signup
 from J3ktMan.page.signin import signin
 
-# the following import is necessary to register the model with the database
-from J3ktMan.model import project  # noqa
-
 
 app = rx.App()
 
