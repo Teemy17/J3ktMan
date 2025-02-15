@@ -4,7 +4,6 @@ dependencies = [
     "reflex-clerk @ git+https://github.com/Simmypeet/reflex-clerk@fix/signup",
     "authlib==1.3.2",
     "python-dotenv==1.0.1",
-    "psycopg2-binary==2.9.10",
 ]
 name = "J3ktMan"
 version = "0.0.1"
