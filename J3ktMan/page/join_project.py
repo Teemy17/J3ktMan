@@ -69,9 +69,7 @@ class State(rx.State):
         if code is None:
             return
 
-        print(code)
         project = get_project_from_invitation_code(code)
-        print(project)
 
         if project is None:
             self.project = InvalidCode()
@@ -80,6 +78,8 @@ class State(rx.State):
         self.project = InvitedPorject(
             id=project.id, name=project.name, code=code
         )
+
+        # TODO: add some check whether the user has already join this project
 
 
 @rx.page(route="/project/join/[code]", on_load=State.on_load)
@@ -137,7 +137,10 @@ def join_project() -> rx.Component:
                         ),
                         rx.fragment(
                             rx.button(
-                                "Accept", width="100%", class_name="shadow-md"
+                                "Accept",
+                                width="100%",
+                                class_name="shadow-md",
+                                on_click=State.on_accept,
                             ),
                             rx.button(
                                 "Decline",
