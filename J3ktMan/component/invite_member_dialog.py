@@ -13,7 +13,11 @@ class InviteMemberDialog(rx.ComponentState):
 
     @rx.event
     async def on_open(self, value: bool, project_id: int):
-        if not value or self.link is not None:
+        if self.link is None:
+            return
+
+        if not value:
+            self.link = None
             return
 
         clerk_state = await self.get_state(ClerkState)
