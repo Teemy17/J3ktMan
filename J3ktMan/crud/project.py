@@ -1,4 +1,5 @@
 from sqlalchemy import delete
+from sqlmodel import Session
 from J3ktMan.model.project import InvitationCode, Project, ProjectMember, Role
 
 from dataclasses import dataclass
@@ -27,6 +28,14 @@ class ExistingProjectNameError(Exception):
 class TooShortProjectNameError(Exception):
     """
     Thrown when a project name is less than 4 characters.
+    """
+
+    pass
+
+
+class InvalidProjectIDError(Exception):
+    """
+    Thrown when a project ID is invalid.
     """
 
     pass
@@ -100,6 +109,132 @@ class UnauthorizedError(Exception):
     role: Role
 
 
+def is_in_project(user_id: str, project_id: int) -> bool:
+    with rx.session() as session:
+        project = session.exec(
+            Project.select().where(Project.id == project_id)
+        ).first()
+
+        if project is None:
+            raise InvalidProjectIDError()
+
+        member = session.exec(
+            ProjectMember.select().where(
+                (ProjectMember.project_id == project_id)
+                & (ProjectMember.user_id == user_id)
+            )
+        ).first()
+
+        return member is not None
+
+
+def remove_expired_invitation_codes(session: Session, current_epoch: int):
+    delete_expired_codes = delete(InvitationCode).where(
+        (InvitationCode.expired_at < current_epoch)  # type:ignore
+    )
+
+    print(delete_expired_codes)
+    print(session.exec(delete_expired_codes))  # type: ignore
+    session.commit()
+
+
+def reedem_invitation_code(invitation_code: str, user_id: str) -> bool:
+    """
+    Redeems an invitation code for the user. Returns the Project that the
+    invitation code is associated with. Returns None if the code is expired or
+    invalid.
+    """
+    with rx.session() as session:
+        current_epoch = int(datetime.datetime.now().timestamp())
+
+        # use this opportunity to clean up expired invitation codes
+        remove_expired_invitation_codes(session, current_epoch)
+
+        invitation = session.exec(
+            InvitationCode.select().where(
+                (InvitationCode.invitation_code == invitation_code)
+                & (InvitationCode.expired_at > current_epoch)
+            )
+        ).first()
+
+        if invitation is None:
+            return False
+
+        project = session.exec(
+            Project.select().where(Project.id == invitation.project_id)
+        ).first()
+
+        if project is None:
+            raise InvalidProjectIDError()
+
+        # check if the user is already a member of the project
+        existing_member = session.exec(
+            ProjectMember.select().where(
+                (ProjectMember.project_id == project.id)
+                & (ProjectMember.user_id == user_id)
+            )
+        ).first()
+
+        if existing_member is not None:
+            return True
+
+        # check if the invitation code has a redeem limit
+        delete_code = False
+        if invitation.redeem_limit is not None:
+            invitation.redeem_limit -= 1
+            delete_code = invitation.redeem_limit == 0
+
+        # add the user as a member of the project
+        new_member = ProjectMember(
+            project_id=project.id,
+            user_id=user_id,
+            role=Role.COLLABORATOR,
+            joined_at=current_epoch,
+        )
+
+        session.add(new_member)
+
+        if delete_code:
+            session.delete(invitation)
+
+        session.commit()
+
+        return True
+
+
+def get_project_from_invitation_code(
+    invitation_code: str,
+) -> Project | None:
+    """
+    Gets the Project that the invitation code is associated with. Returns None
+    if the code is expired or invalid.
+    """
+    with rx.session() as session:
+        current_epoch = int(datetime.datetime.now().timestamp())
+
+        invitation = session.exec(
+            InvitationCode.select().where(
+                (InvitationCode.invitation_code == invitation_code)
+                & (InvitationCode.expired_at > current_epoch)
+            )
+        ).first()
+
+        print(current_epoch)
+        print(invitation)
+
+        if invitation is None:
+            return None
+
+        project = session.exec(
+            Project.select().where(Project.id == invitation.project_id)
+        ).first()
+
+        if project is None:
+            raise ValueError("Project not found")
+
+        return project
+
+
 def get_invitation_code(
     user_id: str, project: int, duration: int, redeem_limit: int | None
 ) -> str:
@@ -110,12 +245,7 @@ def get_invitation_code(
         current_epoch = int(datetime.datetime.now().timestamp())
 
         # use this opportunity to clean up expired invitation codes
-        delete_expired_codes = delete(InvitationCode).where(
-            (InvitationCode.expired_at < current_epoch)  # type: ignore
-        )
-
-        session.exec(delete_expired_codes)  # type: ignore
-        session.commit()
+        remove_expired_invitation_codes(session, current_epoch)
 
         # make sure the user is the owner of the project
         project_member = session.exec(
