@@ -133,8 +133,7 @@ def remove_expired_invitation_codes(session: Session, current_epoch: int):
         (InvitationCode.expired_at < current_epoch)  # type:ignore
     )
 
-    print(delete_expired_codes)
-    print(session.exec(delete_expired_codes))  # type: ignore
+    session.exec(delete_expired_codes)  # type: ignore
     session.commit()
 
 
@@ -218,9 +217,6 @@ def get_project_from_invitation_code(
                 & (InvitationCode.expired_at > current_epoch)
             )
         ).first()
-
-        print(current_epoch)
-        print(invitation)
 
         if invitation is None:
             return None
