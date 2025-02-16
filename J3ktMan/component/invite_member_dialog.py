@@ -13,9 +13,6 @@ class InviteMemberDialog(rx.ComponentState):
 
     @rx.event
     async def on_open(self, value: bool, project_id: int):
-        if self.link is None:
-            return
-
         if not value:
             self.link = None
             return
