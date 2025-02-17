@@ -72,10 +72,6 @@ def navbar() -> rx.Component:
         ),
         rx.mobile_and_tablet(
             rx.hstack(
-                rx.icon_button(
-                    rx.icon("search"),
-                    variant="ghost",
-                ),
                 rx.spacer(),
                 notification_icons(),
                 rx.menu.root(
