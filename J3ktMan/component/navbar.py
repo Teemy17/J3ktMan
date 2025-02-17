@@ -99,7 +99,6 @@ def navbar() -> rx.Component:
                 align_items="center",
             ),
         ),
-        border_bottom="1px solid rgb(230, 230, 230)",
-        # background="white",
+        border_bottom="2px solid rgb(38, 39, 43)",
         width="100%",
     )

@@ -13,7 +13,8 @@ from J3ktMan.component.base import base_page
 #         rx.text("You are signed in!"),
 #     )
 
+
 def index() -> rx.Component:
     return base_page(
-        rx.text("Hello, World!")
+        rx.text("Hello, World!", class_name="text-3xl font-bold text-center"),
     )
