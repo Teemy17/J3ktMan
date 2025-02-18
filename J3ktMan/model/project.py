@@ -70,3 +70,35 @@ class ProjectMember(rx.Model, table=True):
     """
     Unix epoch timestamp of when the member joined the project.
     """
+
+
+class InvitationCode(rx.Model, table=True):
+    """
+    An invitation code that can be used to join a project.
+    """
+
+    invitation_code: str = sql.Field(primary_key=True, nullable=False)
+    """
+    The alphanumeric string that represents the invitation code.
+    """
+
+    project_id: int = sql.Field(nullable=False, foreign_key="project.id")
+    """
+    The project ID that the invitation code is for.
+    """
+
+    created_at: int
+    """
+    The unix epoch timestamp of when the invitation code was created.
+    """
+
+    expired_at: int
+    """
+    The unix epoch timestamp of when the invitation code expires.
+    """
+
+    redeem_limit: int | None
+    """
+    The number of times the invitation code can be used. If None, it can be 
+    used unlimited times. 
+    """
