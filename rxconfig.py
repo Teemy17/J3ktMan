@@ -10,5 +10,6 @@ assert db_url, "DATABASE_URL not found in .env file"
 
 config = rx.Config(
     app_name="J3ktMan",
+    tailwind={},
     db_url=db_url,
 )
