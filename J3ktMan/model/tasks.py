@@ -137,3 +137,10 @@ class TaskDependency(rx.Model, table=True):
     """
     Task's id that the current task depends on.
     """
+    dependant_id: int = sql.Field(
+        foreign_key="task.id",
+        nullable=True,
+    )
+    """
+    Task's id that depends on the current task.
+    """
