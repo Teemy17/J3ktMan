@@ -57,6 +57,11 @@ class Task(rx.Model, table=True):
     Status id of the task.
     """
 
+    name: str
+    """
+    Name of the task.
+    """
+
     priority: Priority = sql.Field(
         sa_column=sql.Column(
             "priority",
