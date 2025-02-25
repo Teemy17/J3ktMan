@@ -1,7 +1,7 @@
 [project]
 dependencies = [
     "reflex==0.7.0",
-    "reflex-clerk @ git+https://github.com/Simmypeet/reflex-clerk@fix/signup",
+    "reflex-clerk @ git+https://github.com/Simmypeet/reflex-clerk@a596d5b40b1045b217a92287fedfa37c1d81aca2",
     "authlib==1.3.2",
     "python-dotenv==1.0.1",
     "psycopg2-binary==2.9.10",
