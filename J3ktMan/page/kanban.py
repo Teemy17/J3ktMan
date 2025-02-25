@@ -2,7 +2,7 @@ import reflex_clerk as clerk
 from reflex.event import EventSpec
 import reflex as rx
 
-from J3ktMan.component.drag_over_vstack import drag_over_vstack
+from J3ktMan.component.drag_zone import drag_zone
 from J3ktMan.component.draggable_card import draggable_card
 from J3ktMan.component.protected import protected_page_with
 from J3ktMan.model.project import Project
@@ -39,15 +39,11 @@ class State(rx.State):
 
     @rx.event
     def set_mouse_over(self, status_id: int) -> None:
-        print(f"attemp to set mouse over from {status_id}")
         self.mouse_over = status_id
 
     @rx.event
-    def remove_mouse_over(self, status_id: int) -> None:
-        print(f"attemp to remove mouse over from {status_id}")
-
-        if self.mouse_over == status_id:
-            self.mouse_over = None
+    def remove_mouse_over(self) -> None:
+        self.mouse_over = None
 
     @rx.var(cache=False)
     def is_loading(self) -> bool:
@@ -159,13 +155,10 @@ class State(rx.State):
 
     @rx.event
     def on_drag(self, task_id: int) -> None:
-        print(f"start drag task {task_id}")
-
         self._dragging_task_id = task_id
 
     @rx.event
     def on_release(self) -> None:
-        print(f"stop drag task {self._dragging_task_id}")
         self._dragging_task_id = None
 
 
@@ -196,7 +189,7 @@ def task_card(task: Task) -> rx.Component:
 
 
 def kanban_column(status: Status) -> rx.Component:
-    return drag_over_vstack(
+    return rx.vstack(
         rx.hstack(
             rx.input(
                 variant="soft",
@@ -210,25 +203,16 @@ def kanban_column(status: Status) -> rx.Component:
             align="center",
             width="100%",
         ),
+        rx.divider(),
         rx.cond(
-            (State.mouse_over == status.id) & (State.is_dragging),
-            rx.hstack(
-                rx.icon_button(
-                    "plus",
-                    variant="ghost",
-                    color_scheme="gray",
-                    size="2",
-                    margin="0.25rem",
-                ),
-                rx.icon_button(
-                    "trash",
-                    variant="ghost",
-                    color_scheme="gray",
-                    size="2",
-                    margin="0.25rem",
-                ),
+            State.mouse_over == status.id,
+            rx.box(
+                height="5rem",
+                width="100%",
+                class_name="""
+                    rounded-lg dark:border-zinc-600 border border-dashed
+                """,
             ),
-            rx.divider(),
         ),
         rx.vstack(
             rx.foreach(status.tasks, task_card),
@@ -240,9 +224,15 @@ def kanban_column(status: Status) -> rx.Component:
                 margin="0.25rem",
             ),
         ),
-        on_drag_enter=lambda: State.set_mouse_over(status.id),
-        on_drag_leave=lambda: State.remove_mouse_over(status.id),
+        drag_zone(
+            position="absolute",
+            width=rx.cond(State.is_dragging, "100%", "0"),
+            height=rx.cond(State.is_dragging, "100%", "0"),
+            on_drag_enter=State.set_mouse_over(status.id),
+            on_drag_leave=State.remove_mouse_over,
+        ),
         width="300px",
+        position="relative",
         class_name="dark:bg-zinc-900 rounded-lg p-2 shadow-md",
     )
 
