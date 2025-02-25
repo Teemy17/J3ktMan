@@ -47,7 +47,9 @@ class Task(rx.Model, table=True):
 
     id: int = sql.Field(primary_key=True, nullable=False)  # type:ignore
 
-    milestone_id: int = sql.Field(foreign_key="milestone.id", nullable=False)
+    milestone_id: int | None = sql.Field(
+        foreign_key="milestone.id", nullable=True
+    )
     """
     Milestone's id that the task belongs to.
     """

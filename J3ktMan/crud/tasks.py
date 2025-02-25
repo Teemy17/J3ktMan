@@ -27,6 +27,10 @@ class CyclicDependencyError(Exception):
     pass
 
 
+class MilestoneAlreadyAssignedError(Exception):
+    pass
+
+
 class MilestoneCreate(rx.Base):
     name: str
     description: str
@@ -84,6 +88,34 @@ def get_milestone_by_id(milestone_id: int) -> Milestone | None:
         ).first()
 
 
+def assign_milestone(milestone_id: int, task_id: str) -> Task | None:
+    """
+    Assign a milestone to an existing task.
+
+    Chechs:
+    - If the milestone is already assigned to the task
+    """
+    with rx.session() as session:
+        existing_milestone = session.exec(
+            Task.select().where(
+                (Task.milestone_id == milestone_id) & (Task.id == task_id)
+            )
+        ).first()
+
+        if existing_milestone is not None:
+            raise MilestoneAlreadyAssignedError()
+
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            return
+
+        task.milestone_id = milestone_id
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+        return task
+
+
 def delete_milestone(milestone_id: int) -> None:
     """
     Deletes a milestone by its ID.
@@ -110,7 +142,6 @@ def delete_milestone(milestone_id: int) -> None:
 def create_task(
     name: str,
     description: str,
-    parent_milestone_id: int,
     priority: Priority,
     status_id: int,
 ) -> Task:
@@ -121,7 +152,7 @@ def create_task(
     - If there's a task with the same name in the same milestone
     """
     with rx.session() as session:
-        task = session.exec(Task.select().where((Task.name == name)))
+        task = session.exec(Task.select().where((Task.name == name))).first()
 
         if task is not None:
             raise ExistingTaskNameError()
@@ -129,7 +160,7 @@ def create_task(
         new_task = Task(
             name=name,
             description=description,
-            milestone_id=parent_milestone_id,
+            milestone_id=None,
             priority=priority,
             status_id=status_id,
         )
@@ -162,7 +193,7 @@ def delete_task(task_id: int) -> None:
 
         assignments = session.exec(
             TaskAssignment.select().where((TaskAssignment.task_id == task_id))
-        )
+        ).all()
 
         for assignment in assignments:
             session.delete(assignment)
@@ -171,7 +202,7 @@ def delete_task(task_id: int) -> None:
             TaskDependency.select().where(
                 (TaskDependency.dependency_id == task_id)
             )
-        )
+        ).all()
 
         for dependency in dependencies:
             session.delete(dependency)
@@ -260,7 +291,8 @@ def unassign_task(task_id: int, user_id: str) -> None:
                 (TaskAssignment.task_id == task_id)
                 & (TaskAssignment.user_id == user_id)
             )
-        )
+        ).first()
+
         if assigned_task is None:
             return
 
@@ -312,7 +344,7 @@ def remove_task_dependency(
                 (TaskDependency.dependency_id == dependent_task_id)
                 & (TaskDependency.dependant_id == dependency_task_id)
             )
-        )
+        ).first()
 
         if dependency is None:
             return
