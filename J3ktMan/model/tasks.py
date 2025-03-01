@@ -47,6 +47,16 @@ class Task(rx.Model, table=True):
 
     id: int = sql.Field(primary_key=True, nullable=False)  # type:ignore
 
+    name: str
+    """
+    Name of the task.
+    """
+
+    description: str
+    """
+    Description of the task.
+    """
+
     milestone_id: int | None = sql.Field(
         foreign_key="milestone.id", nullable=True
     )
@@ -57,11 +67,6 @@ class Task(rx.Model, table=True):
     status_id: int = sql.Field(foreign_key="status.id", nullable=False)
     """
     Status id of the task.
-    """
-
-    name: str
-    """
-    Name of the task.
     """
 
     priority: Priority = sql.Field(
@@ -75,9 +80,13 @@ class Task(rx.Model, table=True):
     Priority of the task (LOW, MEDIUM, HIGH).
     """
 
-    description: str
+    start_date: int
     """
-    Description of the task.
+    Unix epoch timestamp of when the task starts.
+    """
+    end_date: int
+    """
+    Unix epoch timestamp of when the task ends.
     """
 
 
