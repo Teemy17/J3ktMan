@@ -1,53 +1,32 @@
 import reflex as rx
 from J3ktMan.component.project_card import project_card
 from J3ktMan.component.base import base_page
+from J3ktMan.component.create_project_dialog import create_project_dialog
+from J3ktMan.state.home_state import HomeState
 
-# Sample project data
-projects = [
-    {
-        "name": "Project 1",
-        "description": "Lorem ipsum lodpr lamo jwjwj kekw\nsadad moel aal p apkda",
-        "comments": 12,
-        "files": 0,
-    },
-    {
-        "name": "Project 2",
-        "description": "Another project description example.",
-        "comments": 8,
-        "files": 2,
-    },
-    {
-        "name": "Project 3",
-        "description": "Lorem ipus.",
-        "comments": 5,
-        "files": 1,
-    },
-    {
-        "name": "Project 4",
-        "description": "Another project description example.",
-        "comments": 8,
-        "files": 2,
-    }
-]
 
 def home() -> rx.Component:
     return base_page(
         rx.vstack(
             rx.text("Home", size="7", weight="bold"),
+            create_project_dialog(
+                rx.button("Create Project")
+            ),
             rx.grid(
                 rx.foreach(
-                    projects,
+                    HomeState.get_user_projects, #type: ignore
                     lambda project: project_card(
-                        name=project["name"],
-                        description=project["description"],
-                        comments=project["comments"],
-                        files=project["files"],
+                        name=project.name,
+                        description=f"Created at: {project.created_at}",
+                        comments=0,
+                        files=0,
                     )
                 ),
                 columns="3",
                 spacing="6",
                 align="start",
                 width="100%"
-            )
+            ),
+            width="100%",
         )
     )
