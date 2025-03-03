@@ -19,6 +19,6 @@ app.add_page(index)
 # for some reason, the @rx.page(route="...") decorator doesn't work so the route is added manually here :(
 app.add_page(signin, route="signin/[[...slug]]")
 app.add_page(signup, route="signup/[[...slug]]")
-app.add_page(home, route="home/[[...slug]]")
+app.add_page(home, route="home")
 
 app.add_page(join_project)
