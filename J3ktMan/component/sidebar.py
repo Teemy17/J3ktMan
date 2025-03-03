@@ -78,7 +78,10 @@ def sidebar() -> rx.Component:
                 width=rx.cond(DrawerState.is_desktop_expanded, "16em", "4em"),
                 transition="all 0.3s ease-in-out",
                 class_name="shadow-lg",
-                border_right="2px solid rgb(38, 39, 43)",
+                border_right=rx.color_mode_cond(
+                    dark="2px solid rgb(38, 39, 43)",
+                    light="2px solid #E2E8F0"
+                ),
             ),
         ),
         # Not handle properly yet

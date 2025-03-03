@@ -22,6 +22,20 @@ def notification_icons() -> rx.Component:
             variant="ghost",
             aria_label="Notifications",
         ),
+        rx.color_mode_cond(
+            light=rx.icon_button(
+                rx.icon("moon"),
+                variant="ghost",
+                aria_label="Dark mode",
+                on_click=rx.toggle_color_mode,
+            ),
+            dark=rx.icon_button(
+                rx.icon("sun"),
+                variant="ghost",
+                aria_label="Light mode",
+                on_click=rx.toggle_color_mode,
+            ),
+        ),
         spacing="7",
     )
 
@@ -95,6 +109,9 @@ def navbar() -> rx.Component:
                 align_items="center",
             ),
         ),
-        border_bottom="2px solid rgb(38, 39, 43)",
+        border_bottom=rx.color_mode_cond(
+            dark="2px solid rgb(38, 39, 43)",
+            light="2px solid #E2E8F0"
+        ),
         width="100%",
     )
