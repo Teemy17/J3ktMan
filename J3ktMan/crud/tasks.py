@@ -56,9 +56,9 @@ def create_milestone(info: MilestoneCreate) -> Milestone:
             raise ExistingMilestoneNameError()
 
         milestone = Milestone(
-            name=MilestoneCreate.name,
-            description=MilestoneCreate.description,
-            project_id=MilestoneCreate.parent_project_id,
+            name=info.name,
+            description=info.description,
+            project_id=info.parent_project_id,
             due_date=current_time,
         )
         session.add(milestone)
