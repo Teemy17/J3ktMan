@@ -393,6 +393,38 @@ def remove_task_dependency(
         session.commit()
 
 
+class ExistingStatusNameError(Exception):
+    pass
+
+
+def create_status(name: str, description: str, project_id: int) -> Status:
+    """
+    Creates a status in the given project ID.
+    """
+    with rx.session() as session:
+        # check if there's exist a status with the same name
+        existing_status = session.exec(
+            Status.select().where(
+                (Status.name == name) & (Status.project_id == project_id)
+            )
+        ).first()
+
+        if existing_status is not None:
+            raise ExistingStatusNameError()
+
+        status = Status(
+            name=name,
+            description=description,
+            project_id=project_id,
+        )
+
+        session.add(status)
+        session.commit()
+        session.refresh(status)
+
+        return status
+
+
 class InvalidTaskIDError(Exception):
     pass
 
