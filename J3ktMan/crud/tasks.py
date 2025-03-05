@@ -68,6 +68,48 @@ def create_milestone(info: MilestoneCreate) -> Milestone:
         return milestone
 
 
+def get_milestone_by_task_id(task_id: int) -> Milestone | None:
+    """
+    Returns the milestone of a task.
+    """
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        return session.exec(
+            Milestone.select().where(Milestone.id == task.milestone_id)
+        ).first()
+
+
+def set_task_description(task_id: int, new_description: str) -> Task:
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        task.description = new_description
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        return task
+
+
+def rename_task(task_id: int, new_name: str) -> Task:
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        task.name = new_name
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        return task
+
+
 def get_milestones_by_project_id(project_id: int) -> Sequence[Milestone]:
     """
     Returns all milestones in the given project ID.
@@ -351,3 +393,7 @@ def remove_task_dependency(
 
         session.delete(dependency)
         session.commit()
+class InvalidTaskIDError(Exception):
+    pass
+
+
