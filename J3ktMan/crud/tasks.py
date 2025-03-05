@@ -1,6 +1,7 @@
 import reflex as rx
 from ..model.tasks import (
     Task,
+    Status,
     TaskAssignment,
     TaskDependency,
     Milestone,
@@ -203,6 +204,9 @@ def create_task(
 
         session.add(new_task)
         session.commit()
+
+        session.refresh(new_task)
+
         return new_task
 
 
@@ -387,6 +391,8 @@ def remove_task_dependency(
 
         session.delete(dependency)
         session.commit()
+
+
 class InvalidTaskIDError(Exception):
     pass
 
