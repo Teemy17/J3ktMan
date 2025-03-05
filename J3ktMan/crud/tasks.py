@@ -130,26 +130,20 @@ def get_milestone_by_id(milestone_id: int) -> Milestone | None:
         ).first()
 
 
-def assign_milestone(milestone_id: int, task_id: str) -> Task | None:
+def assign_milestone(milestone_id: int | None, task_id: int) -> Task | None:
     """
     Assign a milestone to an existing task.
-
-    Chechs:
-    - If the milestone is already assigned to the task
     """
     with rx.session() as session:
-        existing_milestone = session.exec(
-            Task.select().where(
-                (Task.milestone_id == milestone_id) & (Task.id == task_id)
-            )
-        ).first()
-
-        if existing_milestone is not None:
-            raise MilestoneAlreadyAssignedError()
 
         task = session.exec(Task.select().where(Task.id == task_id)).first()
         if task is None:
-            return
+            raise InvalidTaskIDError()
+
+        if milestone_id is not None:
+            milestone = get_milestone_by_id(milestone_id)
+            if milestone is None:
+                raise InvalidMilestoneIDError()
 
         task.milestone_id = milestone_id
         session.add(task)
