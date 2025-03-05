@@ -1,4 +1,5 @@
 import reflex as rx
+
 from ..model.tasks import (
     Task,
     Status,
@@ -425,7 +426,55 @@ def create_status(name: str, description: str, project_id: int) -> Status:
         return status
 
 
+def get_statuses_by_project_id(project_id: int) -> Sequence[Status]:
+    """
+    Returns all statuses in the given project ID.
+    """
+    with rx.session() as session:
+        return session.exec(
+            Status.select().where(Status.project_id == project_id)
+        ).all()
+
+
+def get_tasks_by_status_id(status_id: int) -> Sequence[Task]:
+    """
+    Returns all tasks in the given status ID.
+    """
+    with rx.session() as session:
+        return session.exec(
+            Task.select().where(Task.status_id == status_id)
+        ).all()
+
+
 class InvalidTaskIDError(Exception):
     pass
 
 
+class InvalidStatusIDError(Exception):
+    pass
+
+
+class InvalidMilestoneIDError(Exception):
+    pass
+
+
+def set_status(task_id: int, status_id: int) -> int:
+    with rx.session() as session:
+        # check if the task and status exist in the same project
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if task is None:
+            raise InvalidTaskIDError()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        previous_status_id = task.status_id
+        task.status_id = status_id
+
+        session.commit()
+
+        return previous_status_id
