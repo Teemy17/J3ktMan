@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from J3ktMan.component import timeline, base
-from functools import partial
+from typing_extensions import TypedDict
 
 
 def epoch_to_date(epoch: int) -> str:
@@ -57,18 +57,33 @@ def get_sprint_data() -> pd.DataFrame:
             "2025-03-10",
             "2025-03-25",
         ],
+        "status": [
+            "DONE",
+            "IN PROGRESS",
+            "IN PROGRESS",
+            "IN PROGRESS",
+            "IN PROGRESS",
+            "IN PROGRESS",
+        ],
     }
     return pd.DataFrame(mock_data)
 
 
+class TaskDict(TypedDict):
+    id: str
+    name: str
+    start_date: str
+    end_date: str
+    start_position: float
+    end_position: float
+    status: str
+
+
 class TimelineState(rx.State):
     sprint_data: pd.DataFrame = get_sprint_data()
-    current_date: str = datetime.now().strftime(
-        "%Y-%m-%d"
-    )  # The vertical line date
-
+    current_date: str = datetime.now().strftime("%Y-%m-%d")
     months: List[str] = []
-    positions: List[Dict[str, Any]] = []
+    positions: List[TaskDict] = []  # Type annotation for positions
     current_date_position: float = 0.0
 
     def on_mount(self):
@@ -77,29 +92,18 @@ class TimelineState(rx.State):
         self.compute_positions()
         self.compute_current_date_position()
 
-        print(self.months)
-
     def compute_months(self) -> None:
-        """
-        Compute the timeline's months based on the start and end dates
-        of the tasks by rounding the dates to the nearest whole month.
-        """
         all_dates = (
             self.sprint_data["start_date"].tolist()
             + self.sprint_data["end_date"].tolist()
         )
-
         start = min(datetime.strptime(d, "%Y-%m-%d") for d in all_dates)
         end = max(datetime.strptime(d, "%Y-%m-%d") for d in all_dates)
-
-        # Round to whole months
         start = datetime(start.year, start.month, 1)
-        # If the end date is in December, move to the next year
         if end.month == 12:
             end = datetime(end.year + 1, 1, 1)
         else:
             end = datetime(end.year, end.month + 1, 1)
-
         months = []
         current = start
         while current < end:
@@ -108,14 +112,9 @@ class TimelineState(rx.State):
                 current = datetime(current.year + 1, 1, 1)
             else:
                 current = datetime(current.year, current.month + 1, 1)
-
         self.months = months
 
     def compute_positions(self):
-        """
-        Compute the positions of the tasks on the timeline based on the
-        start and end dates of the tasks.
-        """
         all_dates = (
             self.sprint_data["start_date"].tolist()
             + self.sprint_data["end_date"].tolist()
@@ -126,52 +125,33 @@ class TimelineState(rx.State):
         last_task_date = max(
             datetime.strptime(d, "%Y-%m-%d") for d in all_dates
         )
-
-        # Add some padding to the first and last dates
-        first_task_date = datetime(
-            first_task_date.year, first_task_date.month, 1
-        )
-        if last_task_date.month == 12:
-            last_task_date = datetime(last_task_date.year + 1, 1, 31)
-        else:
-            last_task_date = datetime(
-                last_task_date.year, last_task_date.month + 2, 1
-            ) - timedelta(days=1)
-
-        # Calculate the total number of days between the first and last task
         total_days = (last_task_date - first_task_date).days
-
         positions = []
         for _, row in self.sprint_data.iterrows():
             start_date = datetime.strptime(row["start_date"], "%Y-%m-%d")
             end_date = datetime.strptime(row["end_date"], "%Y-%m-%d")
-
-            # Calculate the position of the task on the timeline as percentages
             start_position = (
                 (start_date - first_task_date).days / total_days
             ) * 100
             end_position = (
                 (end_date - first_task_date).days / total_days
             ) * 100
-
+            start_position = max(0, min(100, start_position))
+            end_position = max(0, min(100, end_position))
             positions.append(
                 {
                     "id": row["id"],
                     "name": row["name"],
                     "start_date": row["start_date"],
                     "end_date": row["end_date"],
-                    "start_position": start_position,
-                    "end_position": end_position,
+                    "start_position": float(start_position),
+                    "end_position": float(end_position),
                 }
             )
-
+        print("Computed positions:", positions)
         self.positions = positions
 
     def compute_current_date_position(self):
-        """
-        Compute the position of the current date line on the timeline
-        and store it in state.
-        """
         all_dates = (
             self.sprint_data["start_date"].tolist()
             + self.sprint_data["end_date"].tolist()
@@ -183,21 +163,14 @@ class TimelineState(rx.State):
             datetime.strptime(d, "%Y-%m-%d") for d in all_dates
         )
         total_days = (last_task_date - first_task_date).days
-
-        # Calculate the position of the current date line
         current_date = datetime.strptime(self.current_date, "%Y-%m-%d")
         current_date_position = (
             (current_date - first_task_date).days / total_days * 100
         )
-
         self.current_date_position = current_date_position
 
     @rx.event
     async def on_date_change(self, new_date: str) -> None:
-        """
-        Handle the change of the current date and update the position
-        of the current date line on the timeline.
-        """
         self.current_date = new_date
         self.compute_current_date_position()
 

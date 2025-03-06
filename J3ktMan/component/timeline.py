@@ -12,7 +12,7 @@ def get_status_color(status):
         return "#e0e0e0"
 
 
-def month_header(month) -> rx.Component:
+def month_header(month: str) -> rx.Component:
     """Month header box."""
     return rx.box(
         rx.text(month, font_size="14px", weight="bold"),
@@ -23,16 +23,28 @@ def month_header(month) -> rx.Component:
     )
 
 
-def task_row(task) -> rx.Component:
-    """Task row with the timeline bar."""
+
+def task_row(task: Dict[str, Any]) -> rx.Component:
+    start_pos = task["start_position"]
+    end_pos = task["end_position"]
+    width_percent = rx.cond(
+        end_pos >= start_pos,
+        end_pos - start_pos,
+        0,  # Default to 0 if subtraction is invalid
+    )
+    start_percent = start_pos
+
+    print("Task:", task)
+    print("Width percent (reactive):", width_percent)
+    print("Start percent (reactive):", start_percent)
+
     return rx.hstack(
-        # Task timeline bar
         rx.box(
             rx.box(
                 position="absolute",
-                left=f"{task['start_position']}%",
+                left=f"{start_percent}%",
                 height="20px",
-                width=f"{task['end_position']}%",
+                width=f"{width_percent}%",
                 background_color="#5b279c",
                 border_radius="3px",
             ),
@@ -43,7 +55,7 @@ def task_row(task) -> rx.Component:
         width="100%",
         padding_y="0.5rem",
         border_bottom="1px solid #4d4d4d",
-        height="40px",  # Fixed height to match timeline rows
+        height="40px",
     )
 
 
