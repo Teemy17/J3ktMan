@@ -4,6 +4,7 @@ from J3ktMan.model.project import Project
 from J3ktMan.crud.project import get_projects
 from reflex_clerk import ClerkState
 
+
 class HomeState(rx.State):
     """State for the home page."""
 
@@ -20,7 +21,7 @@ class HomeState(rx.State):
 
         # The refresh_trigger will force the computed var to re-run
         _ = self.refresh_trigger
-        return get_projects(clerk_state.user_id) #type: ignore
+        return get_projects(clerk_state.user_id)  # type: ignore
 
     def refresh_projects(self):
         """Increment the refresh trigger to force a refresh"""
