@@ -42,7 +42,7 @@ def get_sprint_data() -> pd.DataFrame:
             "Post-deployment",
         ],
         "start_date": [
-            "2025-02-01",
+            "2025-01-01",
             "2025-02-15",
             "2025-01-15",
             "2025-02-20",
@@ -211,7 +211,18 @@ def render_month_headers():
     )
 
 
-def render_task_rows():
+def render_task_name():
+    """Render the task names."""
+    return rx.fragment(
+        # add padding to align the task names with the timeline bars
+        rx.box(padding_y="18.5px"),
+        rx.foreach(
+            TimelineState.positions, lambda task: timeline.task_name(task)
+        ),
+    )
+
+
+def render_tasks():
     """Render the task rows with timeline bars."""
     return rx.fragment(
         rx.foreach(
@@ -225,39 +236,38 @@ def timeline_view() -> rx.Component:
     return base.base_page(
         rx.fragment(
             rx.text("Project Timeline", class_name="text-3xl font-bold mb-20"),
-            rx.hstack(
+            rx.flex(
+                # left side of the timeline (contains the tasks names)
                 rx.box(
-                    rx.text(""),
-                    width="25%",
+                    render_task_name(),
+                    width="200px",
+                    align_items="flex-start",
                 ),
-                rx.hstack(
-                    render_month_headers(),
-                    class_name="w-full relative",
+                # right side of the timeline (contains the timeline bars and month headers)
+                rx.scroll_area(
+                    rx.hstack(
+                        render_month_headers(),
+                    ),
+                    render_tasks(),
+                    width="calc(100% - 200px)",
+                    align_items="flex-start",
+                    position="relative",
                 ),
+                direction="row",
                 width="100%",
-            ),
-            rx.box(
-                rx.box(
-                    position="absolute",
-                    left=f"{TimelineState.current_date_position}%",
-                    top="0",
-                    bottom="0",
-                    width="1px",
-                    background_color="#666",
-                    z_index="1",
-                ),
-                render_task_rows(),
-                position="relative",
-                width="100%",
+                align_items="flex-start",
+                spacing="0",
             ),
             width="100%",
             align_items="stretch",
             spacing="5",
-            max_wdith="1200px",
+            max_width="1200px",
             margin="auto",
             padding="20",
             border="1px solid #ddd",
             border_radius="5",
-            on_mount=partial(TimelineState.on_mount, TimelineState),
+            type="always",
+            scrollbars="horizontal",
+            on_mount=TimelineState.on_mount,  # type:ignore
         )
     )
