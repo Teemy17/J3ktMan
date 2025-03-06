@@ -18,5 +18,5 @@ def bar_chart() -> rx.Component:
         rx.recharts.y_axis(),
         data=data,
         width="100%",
-        height=300,
+        height=250,
     )

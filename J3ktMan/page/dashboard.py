@@ -5,61 +5,29 @@ from J3ktMan.component.Dashboard.pie_chart import pie_chart
 from J3ktMan.component.Dashboard.dashboard_card import dashboard_card
 
 
-# def dashboard() -> rx.Component:
-#     return base_page(
-#         rx.vstack(
-#             rx.text("Dashboard", size="7", weight="bold"),
-#             rx.grid(
-#                 rx.hstack(
-#                     dashboard_card(name="Completed Projects"),
-#                     dashboard_card(name="Active Projects"),
-#                     dashboard_card(name="Total Projects"),
-#                     justify="between",
-#                 ),
-#                 rx.card(
-#                     rx.box(
-#                         bar_chart(),
-#                         width="100%",
-#                         height="250px",
-#                     ),
-#                     padding="4",
-#                     width="100%",
-#                 ),
-#                 rx.card(
-#                     rx.box(
-#                         pie_chart(),
-#                     ),
-#                     padding="4",
-#                     height="300px",
-#                     width="100%",
-#                 ),
-#                 template_columns="repeat(auto-fit, minmax(350px, 1fr))",
-#                 gap="4",
-#                 width="100%",
-#                 spacing_y="5",
-#             ),
-#             width="100%",
-#             spacing="4",
-#         )
-#     )
-#
 def dashboard() -> rx.Component:
     return base_page(
         rx.vstack(
             rx.text("Dashboard", size="7", weight="bold"),
-            rx.grid(
-                rx.hstack(
-                    dashboard_card(name="Completed Projects"),
-                    dashboard_card(name="Active Projects"),
-                    dashboard_card(name="Total Projects"),
-                    justify="between",
+            rx.hstack(
+                rx.box(
+                    dashboard_card(name="Completed Projects", icon="circle-check"),
+                    width="33%",
                 ),
-                template_columns="repeat(auto-fit, minmax(350px, 1fr))",
-                gap="4",
+                rx.box(
+                    dashboard_card(name="Task created", icon="book-check"),
+                    width="33%",
+                ),
+                rx.box(
+                    dashboard_card(name="Task due", icon="calendar-clock"),
+                    width="33%",
+                ),
                 width="100%",
             ),
+            rx.spacer(),
             rx.hstack(
                 rx.card(
+                    rx.text("Priority Breakdown", size="5", weight="bold"),
                     rx.box(
                         bar_chart(),
                     ),
@@ -68,6 +36,7 @@ def dashboard() -> rx.Component:
                     height="300px",
                 ),
                 rx.card(
+                    rx.text("Status overview", size="5", weight="bold"),
                     rx.box(
                         pie_chart(),
                     ),
