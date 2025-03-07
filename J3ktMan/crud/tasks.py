@@ -1,6 +1,8 @@
 import reflex as rx
+
 from ..model.tasks import (
     Task,
+    Status,
     TaskAssignment,
     TaskDependency,
     Milestone,
@@ -56,9 +58,9 @@ def create_milestone(info: MilestoneCreate) -> Milestone:
             raise ExistingMilestoneNameError()
 
         milestone = Milestone(
-            name=MilestoneCreate.name,
-            description=MilestoneCreate.description,
-            project_id=MilestoneCreate.parent_project_id,
+            name=info.name,
+            description=info.description,
+            project_id=info.parent_project_id,
             due_date=current_time,
         )
         session.add(milestone)
@@ -66,6 +68,48 @@ def create_milestone(info: MilestoneCreate) -> Milestone:
         session.refresh(milestone)
 
         return milestone
+
+
+def get_milestone_by_task_id(task_id: int) -> Milestone | None:
+    """
+    Returns the milestone of a task.
+    """
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        return session.exec(
+            Milestone.select().where(Milestone.id == task.milestone_id)
+        ).first()
+
+
+def set_task_description(task_id: int, new_description: str) -> Task:
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        task.description = new_description
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        return task
+
+
+def rename_task(task_id: int, new_name: str) -> Task:
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        task.name = new_name
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        return task
 
 
 def get_milestones_by_project_id(project_id: int) -> Sequence[Milestone]:
@@ -88,26 +132,20 @@ def get_milestone_by_id(milestone_id: int) -> Milestone | None:
         ).first()
 
 
-def assign_milestone(milestone_id: int, task_id: str) -> Task | None:
+def assign_milestone(milestone_id: int | None, task_id: int) -> Task | None:
     """
     Assign a milestone to an existing task.
-
-    Chechs:
-    - If the milestone is already assigned to the task
     """
     with rx.session() as session:
-        existing_milestone = session.exec(
-            Task.select().where(
-                (Task.milestone_id == milestone_id) & (Task.id == task_id)
-            )
-        ).first()
-
-        if existing_milestone is not None:
-            raise MilestoneAlreadyAssignedError()
 
         task = session.exec(Task.select().where(Task.id == task_id)).first()
         if task is None:
-            return
+            raise InvalidTaskIDError()
+
+        if milestone_id is not None:
+            milestone = get_milestone_by_id(milestone_id)
+            if milestone is None:
+                raise InvalidMilestoneIDError()
 
         task.milestone_id = milestone_id
         session.add(task)
@@ -167,6 +205,9 @@ def create_task(
 
         session.add(new_task)
         session.commit()
+
+        session.refresh(new_task)
+
         return new_task
 
 
@@ -351,3 +392,89 @@ def remove_task_dependency(
 
         session.delete(dependency)
         session.commit()
+
+
+class ExistingStatusNameError(Exception):
+    pass
+
+
+def create_status(name: str, description: str, project_id: int) -> Status:
+    """
+    Creates a status in the given project ID.
+    """
+    with rx.session() as session:
+        # check if there's exist a status with the same name
+        existing_status = session.exec(
+            Status.select().where(
+                (Status.name == name) & (Status.project_id == project_id)
+            )
+        ).first()
+
+        if existing_status is not None:
+            raise ExistingStatusNameError()
+
+        status = Status(
+            name=name,
+            description=description,
+            project_id=project_id,
+        )
+
+        session.add(status)
+        session.commit()
+        session.refresh(status)
+
+        return status
+
+
+def get_statuses_by_project_id(project_id: int) -> Sequence[Status]:
+    """
+    Returns all statuses in the given project ID.
+    """
+    with rx.session() as session:
+        return session.exec(
+            Status.select().where(Status.project_id == project_id)
+        ).all()
+
+
+def get_tasks_by_status_id(status_id: int) -> Sequence[Task]:
+    """
+    Returns all tasks in the given status ID.
+    """
+    with rx.session() as session:
+        return session.exec(
+            Task.select().where(Task.status_id == status_id)
+        ).all()
+
+
+class InvalidTaskIDError(Exception):
+    pass
+
+
+class InvalidStatusIDError(Exception):
+    pass
+
+
+class InvalidMilestoneIDError(Exception):
+    pass
+
+
+def set_status(task_id: int, status_id: int) -> int:
+    with rx.session() as session:
+        # check if the task and status exist in the same project
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if task is None:
+            raise InvalidTaskIDError()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        previous_status_id = task.status_id
+        task.status_id = status_id
+
+        session.commit()
+
+        return previous_status_id
