@@ -14,8 +14,8 @@ def home() -> rx.Component:
                 rx.foreach(
                     HomeState.get_user_projects,  # type: ignore
                     lambda project: project_card(
-                        name=project.name,
-                        description=f"Created at: {project.created_at}",
+                        name=project["name"],
+                        description=f"Created at: {project['created_at_formatted']}",
                         comments=0,
                         files=0,
                     ),

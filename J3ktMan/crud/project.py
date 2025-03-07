@@ -58,8 +58,7 @@ def create_project(info: ProjectCreate) -> Project:
             Project.select()
             .join(ProjectMember)
             .where(
-                (Project.name == info.name)
-                & (ProjectMember.user_id == info.user_id)
+                (Project.name == info.name) & (ProjectMember.user_id == info.user_id)
             )
         ).first()
 
@@ -94,9 +93,7 @@ def get_projects(user_id: str) -> Sequence[Project]:
 
     with rx.session() as session:
         return session.exec(
-            Project.select()
-            .join(ProjectMember)
-            .where(ProjectMember.user_id == user_id)
+            Project.select().join(ProjectMember).where(ProjectMember.user_id == user_id)
         ).all()
 
 
@@ -111,9 +108,7 @@ class UnauthorizedError(Exception):
 
 def is_in_project(user_id: str, project_id: int) -> bool:
     with rx.session() as session:
-        project = session.exec(
-            Project.select().where(Project.id == project_id)
-        ).first()
+        project = session.exec(Project.select().where(Project.id == project_id)).first()
 
         if project is None:
             raise InvalidProjectIDError()
@@ -130,7 +125,9 @@ def is_in_project(user_id: str, project_id: int) -> bool:
 
 def remove_expired_invitation_codes(session: Session, current_epoch: int):
     delete_expired_codes = delete(InvitationCode).where(
-        (InvitationCode.expired_at < current_epoch)  # type:ignore
+        (
+            InvitationCode.expired_at < current_epoch  # type:ignore
+        )
     )
 
     session.exec(delete_expired_codes)  # type: ignore
@@ -272,9 +269,7 @@ def get_invitation_code(
         # pedantic: in case of very unluckly dude who gets the same code
         while True:
             existing_code = session.exec(
-                InvitationCode.select().where(
-                    InvitationCode.invitation_code == code
-                )
+                InvitationCode.select().where(InvitationCode.invitation_code == code)
             ).first()
 
             if existing_code is None:
