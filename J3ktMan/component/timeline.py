@@ -16,12 +16,13 @@ def month_header(month: str) -> rx.Component:
     """Month header box."""
     return rx.box(
         rx.text(month, font_size="14px", weight="bold"),
-        flex="1",
+        min_width="300px",
+        flex="0 0 auto",
         text_align="center",
         background_color="#303030",
         padding_y="0.5rem",
+        border_right="1px solid #4d4d4d",
     )
-
 
 
 def task_row(task: Dict[str, Any]) -> rx.Component:

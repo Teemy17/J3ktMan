@@ -10,63 +10,170 @@ def epoch_to_date(epoch: int) -> str:
     return datetime.fromtimestamp(epoch).strftime("%Y-%m-%d")
 
 
+def get_milestone_data() -> pd.DataFrame:
+    # TODO: Fetch the data from the backend
+    """
+    data format should be like this:
+        data = [
+            {
+                "id": 1,
+                "project_id": 1,
+                "name": "Milestone 1",
+                "description": "First milestone",
+                "due_date": 1640995200,  # Epoch timestamp
+            },
+        ]
+    """
+    mock_data = [
+        {
+            "id": 1,
+            "project_id": 1,
+            "name": "Milestone 1",
+            "description": "First milestone",
+            "due_date": 1735689600,  # 2025-01-01 00:00:00 UTC
+        },
+        {
+            "id": 2,
+            "project_id": 1,
+            "name": "Milestone 2",
+            "description": "Second milestone",
+            "due_date": 1739462400,  # 2025-02-15 00:00:00 UTC
+        },
+        {
+            "id": 3,
+            "project_id": 1,
+            "name": "Milestone 3",
+            "description": "Third milestone",
+            "due_date": 1741075200,  # 2025-03-01 00:00:00 UTC
+        },
+        {
+            "id": 4,
+            "project_id": 1,
+            "name": "Milestone 4",
+            "description": "Fourth milestone",
+            "due_date": 1748016000,  # 2025-06-23 00:00:00 UTC
+        },
+    ]
+
+    # Convert epoch timestamps to date strings
+    data = [
+        {
+            "id": milestone["id"],
+            "project_id": milestone["project_id"],
+            "name": milestone["name"],
+            "description": milestone["description"],
+            "due_date": epoch_to_date(milestone["due_date"]),
+        }
+        for milestone in mock_data
+    ]
+    return pd.DataFrame(data)
+
+
 # Fetch the project tasks data
 def get_sprint_data() -> pd.DataFrame:
     # TODO: Fetch the data from the backend
     """
     data format should be like this:
-        data = {
-            "id": ["SW-5", "SW-6"],
-            "name": [
-                "Planning",
-                "Design",
-            ],
-            "start_date": [
-                "2025-02-01",
-                "2025-02-15",
-            ],
-            "end_date": [
-                "2025-02-15",
-                "2025-03-01",
-            ],
-        }
+        data = [
+            {
+                "id": "SW-5",
+                "name": "Planning",
+                "description": "Planning the project",
+                "milestone_id": 1,
+                "status_id": 1,
+                "priority": "HIGH",
+                "start_date": 1640995200,  # Epoch timestamp
+                "end_date": 1644844800,    # Epoch timestamp
+            },
+        ]
     """
-    mock_data = {
-        "id": ["SW-5", "SW-6", "SW-13", "SW-14", "SW-15", "SW-25"],
-        "name": [
-            "Planning",
-            "Design",
-            "Development",
-            "Testing",
-            "Deployment",
-            "Post-deployment",
-        ],
-        "start_date": [
-            "2025-01-01",
-            "2025-02-15",
-            "2025-01-15",
-            "2025-02-20",
-            "2025-03-01",
-            "2025-03-10",
-        ],
-        "end_date": [
-            "2025-02-15",
-            "2025-03-01",
-            "2025-02-15",
-            "2025-03-05",
-            "2025-03-10",
-            "2025-03-25",
-        ],
-        "status": [
-            "DONE",
-            "IN PROGRESS",
-            "IN PROGRESS",
-            "IN PROGRESS",
-            "IN PROGRESS",
-            "IN PROGRESS",
-        ],
-    }
-    return pd.DataFrame(mock_data)
+    mock_data = [
+        {
+            "id": "SW-5",
+            "name": "Planning",
+            "description": "Planning the project",
+            "milestone_id": 1,
+            "status_id": 1,  # 1 maps to "DONE"
+            "priority": "HIGH",
+            "start_date": 1735689600,  # 2025-01-01 00:00:00 UTC
+            "end_date": 1736918400,  # 2025-01-15 00:00:00 UTC
+        },
+        {
+            "id": "SW-6",
+            "name": "Design",
+            "description": "Designing the system",
+            "milestone_id": 1,
+            "status_id": 2,  # 2 maps to "IN PROGRESS"
+            "priority": "MEDIUM",
+            "start_date": 1739462400,  # 2025-02-15 00:00:00 UTC
+            "end_date": 1739856000,  # 2025-02-20 00:00:00 UTC
+        },
+        {
+            "id": "SW-13",
+            "name": "Development",
+            "description": "Developing features",
+            "milestone_id": 2,
+            "status_id": 2,  # 2 maps to "IN PROGRESS"
+            "priority": "HIGH",
+            "start_date": 1736304000,  # 2025-01-10 00:00:00 UTC
+            "end_date": 1736918400,  # 2025-01-15 00:00:00 UTC
+        },
+        {
+            "id": "SW-14",
+            "name": "Testing",
+            "description": "Testing the system",
+            "milestone_id": 3,
+            "status_id": 2,  # 2 maps to "IN PROGRESS"
+            "priority": "MEDIUM",
+            "start_date": 1739856000,  # 2025-02-20 00:00:00 UTC
+            "end_date": 1741075200,  # 2025-03-01 00:00:00 UTC
+        },
+        {
+            "id": "SW-15",
+            "name": "Deployment",
+            "description": "Deploying the system",
+            "milestone_id": 3,
+            "status_id": 2,  # 2 maps to "IN PROGRESS"
+            "priority": "HIGH",
+            "start_date": 1741075200,  # 2025-03-01 00:00:00 UTC
+            "end_date": 1741372800,  # 2025-03-05 00:00:00 UTC
+        },
+        {
+            "id": "SW-25",
+            "name": "Post-deployment",
+            "description": "Post-deployment review",
+            "milestone_id": 4,
+            "status_id": 2,  # 2 maps to "IN PROGRESS"
+            "priority": "LOW",
+            "start_date": 1741680000,  # 2025-03-10 00:00:00 UTC
+            "end_date": 1742188800,  # 2025-03-15 00:00:00 UTC
+        },
+        {
+            "id": "SW-30",
+            "name": "Review",
+            "description": "Final review",
+            "milestone_id": 4,
+            "status_id": 2,  # 2 maps to "IN PROGRESS"
+            "priority": "LOW",
+            "start_date": 1748016000,  # 2025-06-23 00:00:00 UTC
+            "end_date": 1748508000,  # 2025-06-28 00:00:00 UTC
+        },
+    ]
+
+    # Convert epoch timestamps to date strings and map status_id to status
+    status_map = {1: "DONE", 2: "IN PROGRESS"}
+    data = [
+        {
+            "id": task["id"],
+            "name": task["name"],
+            "start_date": epoch_to_date(task["start_date"]),
+            "end_date": epoch_to_date(task["end_date"]),
+            "status": status_map.get(task["status_id"], "UNKNOWN"),
+            "milestone_id": task["milestone_id"],
+        }
+        for task in mock_data
+    ]
+    return pd.DataFrame(data)
 
 
 class TaskDict(TypedDict):
@@ -81,9 +188,10 @@ class TaskDict(TypedDict):
 
 class TimelineState(rx.State):
     sprint_data: pd.DataFrame = get_sprint_data()
+    milestone_data: pd.DataFrame = get_milestone_data()
     current_date: str = datetime.now().strftime("%Y-%m-%d")
     months: List[str] = []
-    positions: List[TaskDict] = []  # Type annotation for positions
+    positions: List[TaskDict] = []
     current_date_position: float = 0.0
 
     def on_mount(self):
@@ -126,6 +234,10 @@ class TimelineState(rx.State):
             datetime.strptime(d, "%Y-%m-%d") for d in all_dates
         )
         total_days = (last_task_date - first_task_date).days
+        print(
+            f"First task date: {first_task_date}, Last task date: {last_task_date}, Total days: {total_days}"
+        )
+
         positions = []
         for _, row in self.sprint_data.iterrows():
             start_date = datetime.strptime(row["start_date"], "%Y-%m-%d")
@@ -146,10 +258,26 @@ class TimelineState(rx.State):
                     "end_date": row["end_date"],
                     "start_position": float(start_position),
                     "end_position": float(end_position),
+                    "status": row["status"],
                 }
             )
         print("Computed positions:", positions)
         self.positions = positions
+
+    def toggle_milestone(self, milestone_id: int):
+        """Toggle the collapsed state of a milestone."""
+        updated_milestones = [
+            {
+                **m,
+                "is_collapsed": (
+                    not m["is_collapsed"]
+                    if m["id"] == milestone_id
+                    else m["is_collapsed"]
+                ),
+            }
+            for m in self.milestones
+        ]
+        self.milestones = updated_milestones  # type: ignore
 
     def compute_current_date_position(self):
         all_dates = (
@@ -218,12 +346,21 @@ def timeline_view() -> rx.Component:
                 ),
                 # right side of the timeline (contains the timeline bars and month headers)
                 rx.scroll_area(
-                    rx.hstack(
-                        render_month_headers(),
+                    rx.vstack(
+                        rx.hstack(
+                            render_month_headers(),
+                            spacing="0",
+                            width="100%",
+                            overflow_x="auto",
+                        ),
+                        render_tasks(),
+                        width="100%",
+                        spacing="0",
                     ),
-                    render_tasks(),
                     width="calc(100% - 200px)",
-                    align_items="flex-start",
+                    height="auto",
+                    overflow_x="auto",  # Explicitly enable horizontal scrolling
+                    scrollbars="horizontal",  # Show horizontal scrollbar
                     position="relative",
                 ),
                 direction="row",
@@ -239,8 +376,6 @@ def timeline_view() -> rx.Component:
             padding="20",
             border="1px solid #ddd",
             border_radius="5",
-            type="always",
-            scrollbars="horizontal",
             on_mount=TimelineState.on_mount,  # type:ignore
         )
     )
