@@ -168,7 +168,7 @@ def get_sprint_data() -> pd.DataFrame:
             "name": task["name"],
             "start_date": epoch_to_date(task["start_date"]),
             "end_date": epoch_to_date(task["end_date"]),
-            "status": status_map.get(task["status_id"], "UNKNOWN"),
+            "status": status_map.get(task["status_id"], "IN PROGRESS"),
             "milestone_id": task["milestone_id"],
         }
         for task in mock_data
@@ -184,6 +184,18 @@ class TaskDict(TypedDict):
     start_position: float
     end_position: float
     status: str
+    milestone_id: int
+
+
+class MilestoneDict(TypedDict):
+    id: int
+    project_id: int
+    name: str
+    description: str
+    due_date: str
+    tasks: List[TaskDict]
+    start_position: float
+    end_position: float
 
 
 class TimelineState(rx.State):
@@ -191,13 +203,16 @@ class TimelineState(rx.State):
     milestone_data: pd.DataFrame = get_milestone_data()
     current_date: str = datetime.now().strftime("%Y-%m-%d")
     months: List[str] = []
-    positions: List[TaskDict] = []
+    milestones: List[MilestoneDict] = []
+    expanded_milestones: Dict[int, bool] = (
+        {}
+    )  # Track which milestones are expanded
     current_date_position: float = 0.0
 
     def on_mount(self):
         """Initialize all data when the component loads."""
         self.compute_months()
-        self.compute_positions()
+        self.compute_milestones()
         self.compute_current_date_position()
 
     def compute_months(self) -> None:
@@ -222,7 +237,8 @@ class TimelineState(rx.State):
                 current = datetime(current.year, current.month + 1, 1)
         self.months = months
 
-    def compute_positions(self):
+    def compute_milestones(self):
+        # Compute the overall timeline range
         all_dates = (
             self.sprint_data["start_date"].tolist()
             + self.sprint_data["end_date"].tolist()
@@ -234,50 +250,69 @@ class TimelineState(rx.State):
             datetime.strptime(d, "%Y-%m-%d") for d in all_dates
         )
         total_days = (last_task_date - first_task_date).days
-        print(
-            f"First task date: {first_task_date}, Last task date: {last_task_date}, Total days: {total_days}"
-        )
 
-        positions = []
-        for _, row in self.sprint_data.iterrows():
-            start_date = datetime.strptime(row["start_date"], "%Y-%m-%d")
-            end_date = datetime.strptime(row["end_date"], "%Y-%m-%d")
-            start_position = (
-                (start_date - first_task_date).days / total_days
-            ) * 100
-            end_position = (
-                (end_date - first_task_date).days / total_days
-            ) * 100
-            start_position = max(0, min(100, start_position))
-            end_position = max(0, min(100, end_position))
-            positions.append(
-                {
-                    "id": row["id"],
-                    "name": row["name"],
-                    "start_date": row["start_date"],
-                    "end_date": row["end_date"],
-                    "start_position": float(start_position),
-                    "end_position": float(end_position),
-                    "status": row["status"],
-                }
-            )
-        print("Computed positions:", positions)
-        self.positions = positions
+        # Group tasks by milestone
+        milestones = []
+        for _, milestone in self.milestone_data.iterrows():
+            # Get all tasks for this milestone
+            tasks = self.sprint_data[
+                self.sprint_data["milestone_id"] == milestone["id"]
+            ]
+            task_positions = []
+            if not tasks.empty:
+                # Compute positions for each task
+                for _, task in tasks.iterrows():
+                    start_date = datetime.strptime(
+                        task["start_date"], "%Y-%m-%d"
+                    )
+                    end_date = datetime.strptime(task["end_date"], "%Y-%m-%d")
+                    start_position = (
+                        (start_date - first_task_date).days / total_days
+                    ) * 100
+                    end_position = (
+                        (end_date - first_task_date).days / total_days
+                    ) * 100
+                    start_position = max(0, min(100, start_position))
+                    end_position = max(0, min(100, end_position))
+                    task_positions.append(
+                        {
+                            "id": task["id"],
+                            "name": task["name"],
+                            "start_date": task["start_date"],
+                            "end_date": task["end_date"],
+                            "start_position": float(start_position),
+                            "end_position": float(end_position),
+                            "status": task["status"],
+                            "milestone_id": task["milestone_id"],
+                        }
+                    )
 
-    def toggle_milestone(self, milestone_id: int):
-        """Toggle the collapsed state of a milestone."""
-        updated_milestones = [
-            {
-                **m,
-                "is_collapsed": (
-                    not m["is_collapsed"]
-                    if m["id"] == milestone_id
-                    else m["is_collapsed"]
-                ),
-            }
-            for m in self.milestones
-        ]
-        self.milestones = updated_milestones  # type: ignore
+                # Compute milestone's overall start and end positions
+                milestone_start = min(
+                    task["start_position"] for task in task_positions
+                )
+                milestone_end = max(
+                    task["end_position"] for task in task_positions
+                )
+
+                milestones.append(
+                    {
+                        "id": milestone["id"],
+                        "project_id": milestone["project_id"],
+                        "name": milestone["name"],
+                        "description": milestone["description"],
+                        "due_date": milestone["due_date"],
+                        "start_position": milestone_start,
+                        "end_position": milestone_end,
+                        "tasks": task_positions,
+                    }
+                )
+
+        self.milestones = milestones
+        # Initialize expanded state for each milestone
+        self.expanded_milestones = {
+            milestone["id"]: True for milestone in milestones
+        }
 
     def compute_current_date_position(self):
         all_dates = (
@@ -293,14 +328,15 @@ class TimelineState(rx.State):
         total_days = (last_task_date - first_task_date).days
         current_date = datetime.strptime(self.current_date, "%Y-%m-%d")
         current_date_position = (
-            (current_date - first_task_date).days / total_days * 100
-        )
+            (current_date - first_task_date).days / total_days
+        ) * 100
         self.current_date_position = current_date_position
 
-    @rx.event
-    async def on_date_change(self, new_date: str) -> None:
-        self.current_date = new_date
-        self.compute_current_date_position()
+    def toggle_milestone(self, milestone_id: int):
+        """Toggle the expanded state of a milestone."""
+        self.expanded_milestones[milestone_id] = (
+            not self.expanded_milestones.get(milestone_id, False)
+        )
 
 
 def render_month_headers():
@@ -313,21 +349,130 @@ def render_month_headers():
 
 
 def render_task_name():
-    """Render the task names."""
+    """Render the milestone names and their tasks (when expanded)."""
+
+    def render_milestone_name(milestone):
+        is_expanded = TimelineState.expanded_milestones[milestone["id"]]
+        return rx.vstack(
+            rx.hstack(
+                rx.icon(
+                    # tag="chevron-right" if not is_expanded else "chevron-down",
+                    tag=rx.cond(
+                        is_expanded,
+                        "chevron-down",
+                        "chevron-right",
+                    ),
+                    on_click=lambda: TimelineState.toggle_milestone(
+                        milestone["id"]  # type:ignore
+                    ),
+                    cursor="pointer",
+                    margin_right="0.5rem",
+                ),
+                rx.text(
+                    milestone["name"],
+                    color="#eee",
+                    font_size="14px",
+                    font_weight="bold",
+                ),
+                spacing="2",
+                align_items="center",
+                width="100%",
+                height="40px",
+                min_height="40px",
+            ),
+            rx.cond(
+                is_expanded,
+                rx.foreach(
+                    milestone["tasks"],
+                    lambda task: rx.box(
+                        rx.hstack(
+                            rx.box(
+                                width="12px",
+                                height="12px",
+                                background_color=timeline.get_status_color(
+                                    str(task["status"])
+                                ),
+                                border_radius="2px",
+                            ),
+                            rx.text(
+                                task["name"],
+                                color="#eee",
+                                font_size="14px",
+                                font_weight="medium",
+                            ),
+                            spacing="2",
+                            align_items="center",
+                            # width="100%",
+                            # height="40px",
+                        ),
+                        padding_left="1.5rem",
+                        height="40px",
+                    ),
+                ),
+            ),
+            width="100%",
+            spacing="0",
+            align_items="stretch",
+            border_bottom="1px solid #4d4d4d",
+        )
+
     return rx.fragment(
-        # add padding to align the task names with the timeline bars
-        rx.box(padding_y="18.5px"),
+        rx.box(
+            padding_y="18.5px"
+        ),  # ensure the first task name aligns with the first timeline bar
         rx.foreach(
-            TimelineState.positions, lambda task: timeline.task_name(task)
+            TimelineState.milestones,
+            render_milestone_name,
         ),
     )
 
 
 def render_tasks():
-    """Render the task rows with timeline bars."""
+    """Render the milestone rows with timeline bars (collapsed or expanded)."""
+
+    def render_milestone_row(milestone: MilestoneDict) -> rx.Component:
+        is_expanded = TimelineState.expanded_milestones[milestone["id"]]
+        return rx.vstack(
+            # Milestone bar
+            rx.hstack(
+                rx.box(
+                    rx.box(
+                        position="absolute",
+                        left=f"{milestone['start_position']}%",
+                        width=f"{milestone['end_position'] - milestone['start_position']}%",
+                        height="20px",
+                        background_color="#5b279c",
+                        border_radius="3px",
+                        border="1px solid white",  # Make it visible
+                        padding_y="0.5rem",
+                    ),
+                    position="relative",
+                    height="100%",
+                    width="100%",
+                ),
+                width="100%",
+                padding_y="0.5rem",
+                border_bottom=rx.cond(
+                    is_expanded, "none", "1px solid #4d4d4d"
+                ),
+                height="41px",
+            ),
+            # Task bars
+            rx.cond(
+                is_expanded,
+                rx.foreach(
+                    milestone["tasks"],
+                    lambda task: timeline.task_row(task),
+                ),
+            ),
+            spacing="0",
+            width="100%",  # Force the container to take full width
+        )
+
     return rx.fragment(
         rx.foreach(
-            TimelineState.positions, lambda task: timeline.task_row(task)
+            TimelineState.milestones,
+            render_milestone_row,
         )
     )
 
@@ -338,13 +483,12 @@ def timeline_view() -> rx.Component:
         rx.fragment(
             rx.text("Project Timeline", class_name="text-3xl font-bold mb-20"),
             rx.flex(
-                # left side of the timeline (contains the tasks names)
                 rx.box(
                     render_task_name(),
                     width="200px",
                     align_items="flex-start",
+                    height="auto",
                 ),
-                # right side of the timeline (contains the timeline bars and month headers)
                 rx.scroll_area(
                     rx.vstack(
                         rx.hstack(
@@ -356,17 +500,20 @@ def timeline_view() -> rx.Component:
                         render_tasks(),
                         width="100%",
                         spacing="0",
+                        align_items="stretch",
+                        # position="relative",
                     ),
                     width="calc(100% - 200px)",
                     height="auto",
-                    overflow_x="auto",  # Explicitly enable horizontal scrolling
-                    scrollbars="horizontal",  # Show horizontal scrollbar
-                    position="relative",
+                    overflow_x="auto",
+                    scrollbars="horizontal",
+                    # position="relative",
                 ),
                 direction="row",
                 width="100%",
-                align_items="flex-start",
+                align_items="stetch",
                 spacing="0",
+                height="auto",
             ),
             width="100%",
             align_items="stretch",

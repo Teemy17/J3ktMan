@@ -2,7 +2,7 @@ import reflex as rx
 from typing import Dict, List, Any
 
 
-def get_status_color(status):
+def get_status_color(status: str):
     """Return color based on status."""
     if status == "DONE":
         return "#4caf50"
@@ -35,9 +35,10 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
     )
     start_percent = start_pos
 
-    print("Task:", task)
-    print("Width percent (reactive):", width_percent)
-    print("Start percent (reactive):", start_percent)
+    # Add explicit logging
+    print(
+        f"Task {task['name']}: start={start_pos}, end={end_pos}, width={width_percent}"
+    )
 
     return rx.hstack(
         rx.box(
@@ -50,7 +51,7 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
                 border_radius="3px",
             ),
             position="relative",
-            height="100%",
+            height="40px",
             width="100%",
         ),
         width="100%",
