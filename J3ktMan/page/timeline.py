@@ -155,8 +155,8 @@ def get_sprint_data() -> pd.DataFrame:
             "milestone_id": 4,
             "status_id": 2,  # 2 maps to "IN PROGRESS"
             "priority": "LOW",
-            "start_date": 1748016000,  # 2025-06-23 00:00:00 UTC
-            "end_date": 1748508000,  # 2025-06-28 00:00:00 UTC
+            "start_date": 1748016000,  # 2025-05-23 00:00:00 UTC
+            "end_date": 1748508000,  # 2025-05-28 00:00:00 UTC
         },
     ]
 
@@ -203,11 +203,13 @@ class TimelineState(rx.State):
     milestone_data: pd.DataFrame = get_milestone_data()
     current_date: str = datetime.now().strftime("%Y-%m-%d")
     months: List[str] = []
+    month_widths: List[float] = []
     milestones: List[MilestoneDict] = []
     expanded_milestones: Dict[int, bool] = (
         {}
     )  # Track which milestones are expanded
     current_date_position: float = 0.0
+    hover_text: str = ""
 
     def on_mount(self):
         """Initialize all data when the component loads."""
@@ -222,23 +224,39 @@ class TimelineState(rx.State):
         )
         start = min(datetime.strptime(d, "%Y-%m-%d") for d in all_dates)
         end = max(datetime.strptime(d, "%Y-%m-%d") for d in all_dates)
-        start = datetime(start.year, start.month, 1)
-        if end.month == 12:
-            end = datetime(end.year + 1, 1, 1)
+        timeline_start = datetime(start.year, start.month, 1) - timedelta(
+            days=30
+        )
+        timeline_end = datetime(end.year, end.month, 1) + timedelta(days=30)
+        if timeline_end.month == 12:
+            timeline_end = datetime(timeline_end.year + 1, 1, 1)
         else:
-            end = datetime(end.year, end.month + 1, 1)
+            timeline_end = datetime(
+                timeline_end.year, timeline_end.month + 1, 1
+            )
+
+        total_days = (timeline_end - timeline_start).days
+
         months = []
-        current = start
-        while current < end:
+        month_widths = []
+        current = timeline_start
+        while current < timeline_end:
             months.append(current.strftime("%b").upper())
             if current.month == 12:
-                current = datetime(current.year + 1, 1, 1)
+                next_month = datetime(current.year + 1, 1, 1)
             else:
-                current = datetime(current.year, current.month + 1, 1)
+                next_month = datetime(current.year, current.month + 1, 1)
+            current = next_month
+
+        total_months = len(months)
+        month_width = 100 / total_months
+        month_widths = [month_width] * total_months
+
         self.months = months
+        self.month_widths = month_widths
 
     def compute_milestones(self):
-        # Compute the overall timeline range
+        # Compute the overall timeline range (including padding)
         all_dates = (
             self.sprint_data["start_date"].tolist()
             + self.sprint_data["end_date"].tolist()
@@ -249,31 +267,90 @@ class TimelineState(rx.State):
         last_task_date = max(
             datetime.strptime(d, "%Y-%m-%d") for d in all_dates
         )
-        total_days = (last_task_date - first_task_date).days
+        timeline_start = datetime(
+            first_task_date.year, first_task_date.month, 1
+        ) - timedelta(days=30)
+        timeline_end = datetime(
+            last_task_date.year, last_task_date.month, 1
+        ) + timedelta(days=30)
+        if timeline_end.month == 12:
+            timeline_end = datetime(timeline_end.year + 1, 1, 1)
+        else:
+            timeline_end = datetime(
+                timeline_end.year, timeline_end.month + 1, 1
+            )
+
+        total_days = (timeline_end - timeline_start).days
+
+        # Calculate the month boundaries in days
+        month_boundaries = []
+        current = timeline_start
+        while current <= timeline_end:
+            days_from_start = (current - timeline_start).days
+            month_boundaries.append(days_from_start)
+            if current.month == 12:
+                current = datetime(current.year + 1, 1, 1)
+            else:
+                current = datetime(current.year, current.month + 1, 1)
+
+        # Calculate the total width of the timeline in pixels
+        total_months = len(month_boundaries) - 1  # Number of months
+        total_width_px = total_months * 300  # 300px per month
+        month_width_px = 300  # Fixed width per month
 
         # Group tasks by milestone
         milestones = []
         for _, milestone in self.milestone_data.iterrows():
-            # Get all tasks for this milestone
             tasks = self.sprint_data[
                 self.sprint_data["milestone_id"] == milestone["id"]
             ]
             task_positions = []
             if not tasks.empty:
-                # Compute positions for each task
                 for _, task in tasks.iterrows():
                     start_date = datetime.strptime(
                         task["start_date"], "%Y-%m-%d"
                     )
                     end_date = datetime.strptime(task["end_date"], "%Y-%m-%d")
-                    start_position = (
-                        (start_date - first_task_date).days / total_days
-                    ) * 100
-                    end_position = (
-                        (end_date - first_task_date).days / total_days
-                    ) * 100
+                    start_days = (start_date - timeline_start).days
+                    end_days = (end_date - timeline_start).days
+
+                    # Find the month index for start and end dates
+                    start_month_idx = 0
+                    end_month_idx = 0
+                    for i in range(len(month_boundaries) - 1):
+                        if (
+                            month_boundaries[i]
+                            <= start_days
+                            < month_boundaries[i + 1]
+                        ):
+                            start_month_idx = i
+                            start_fraction = (
+                                start_days - month_boundaries[i]
+                            ) / (month_boundaries[i + 1] - month_boundaries[i])
+                        if (
+                            month_boundaries[i]
+                            <= end_days
+                            < month_boundaries[i + 1]
+                        ):
+                            end_month_idx = i
+                            end_fraction = (end_days - month_boundaries[i]) / (
+                                month_boundaries[i + 1] - month_boundaries[i]
+                            )
+
+                    # Calculate the pixel position within the month
+                    start_position_px = (start_month_idx * month_width_px) + (
+                        start_fraction * month_width_px  # type: ignore
+                    )
+                    end_position_px = (end_month_idx * month_width_px) + (
+                        end_fraction * month_width_px  # type: ignore
+                    )
+
+                    # Convert to percentages
+                    start_position = (start_position_px / total_width_px) * 100
+                    end_position = (end_position_px / total_width_px) * 100
                     start_position = max(0, min(100, start_position))
                     end_position = max(0, min(100, end_position))
+
                     task_positions.append(
                         {
                             "id": task["id"],
@@ -287,7 +364,6 @@ class TimelineState(rx.State):
                         }
                     )
 
-                # Compute milestone's overall start and end positions
                 milestone_start = min(
                     task["start_position"] for task in task_positions
                 )
@@ -309,9 +385,8 @@ class TimelineState(rx.State):
                 )
 
         self.milestones = milestones
-        # Initialize expanded state for each milestone
         self.expanded_milestones = {
-            milestone["id"]: True for milestone in milestones
+            milestone["id"]: False for milestone in milestones
         }
 
     def compute_current_date_position(self):
@@ -338,13 +413,25 @@ class TimelineState(rx.State):
             not self.expanded_milestones.get(milestone_id, False)
         )
 
+    @rx.var
+    def total_width(self) -> int:
+        """Compute the total width of the timeline in pixels based on the number of months."""
+        return len(self.months) * 300
+
 
 def render_month_headers():
     """Render the month headers dynamically."""
-    return rx.fragment(
+    return rx.hstack(
         rx.foreach(
-            TimelineState.months, lambda month: timeline.month_header(month)
-        )
+            TimelineState.months,
+            lambda month, index: timeline.month_header(
+                month,
+                width=f"{TimelineState.month_widths[index]}%",  # type: ignore
+            ),
+        ),
+        spacing="0",
+        width="100%",
+        min_width=f"{TimelineState.total_width}px",
     )
 
 
@@ -433,7 +520,6 @@ def render_tasks():
     def render_milestone_row(milestone: MilestoneDict) -> rx.Component:
         is_expanded = TimelineState.expanded_milestones[milestone["id"]]
         return rx.vstack(
-            # Milestone bar
             rx.hstack(
                 rx.box(
                     rx.box(
@@ -443,7 +529,7 @@ def render_tasks():
                         height="20px",
                         background_color="#5b279c",
                         border_radius="3px",
-                        border="1px solid white",  # Make it visible
+                        border="1px solid white",
                         padding_y="0.5rem",
                     ),
                     position="relative",
@@ -457,7 +543,6 @@ def render_tasks():
                 ),
                 height="41px",
             ),
-            # Task bars
             rx.cond(
                 is_expanded,
                 rx.foreach(
@@ -466,13 +551,17 @@ def render_tasks():
                 ),
             ),
             spacing="0",
-            width="100%",  # Force the container to take full width
+            width="100%",
         )
 
     return rx.fragment(
-        rx.foreach(
-            TimelineState.milestones,
-            render_milestone_row,
+        rx.box(
+            rx.foreach(
+                TimelineState.milestones,
+                render_milestone_row,
+            ),
+            width="100%",
+            min_width=f"{TimelineState.total_width}px",  # Ensure the tasks area matches the headers
         )
     )
 
@@ -501,13 +590,11 @@ def timeline_view() -> rx.Component:
                         width="100%",
                         spacing="0",
                         align_items="stretch",
-                        # position="relative",
                     ),
                     width="calc(100% - 200px)",
                     height="auto",
                     overflow_x="auto",
                     scrollbars="horizontal",
-                    # position="relative",
                 ),
                 direction="row",
                 width="100%",

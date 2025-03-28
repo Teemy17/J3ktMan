@@ -40,12 +40,11 @@ def month_header(month: str, width: str) -> rx.Component:
         border_right="1px solid #4d4d4d",
     )
 
+
 def task_row(task: Dict[str, Any]) -> rx.Component:
     start_pos: float = task["start_position"]
     end_pos: float = task["end_position"]
     task_id: str = task["id"]
-    
-    # Calculate the width of the task bar
     width_percent = rx.cond(
         end_pos >= start_pos,
         end_pos - start_pos,
@@ -53,57 +52,33 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
     )
     start_percent = start_pos
 
-    # Positioning for start label
+    # Adjust positioning for edge cases
     start_label_left = rx.cond(
-        start_pos < 5,  # If the start is near the left edge
-        "0%", 
+        start_pos < 5,  # If the bar starts near the left edge
+        "0%",  # Align with the left edge of the timeline
         f"{start_percent}%",
     )
     start_label_transform = rx.cond(
         start_pos < 5,
-        "translateX(0%)",  # No transform if near the left edge
-        "translateX(-100%)",  # Move left so the right edge of the label aligns with the bar's start
+        "translateX(0%)",  # No shift if at the left edge
+        "translateX(-100%)",
     )
-
-    # Positioning for end label
     end_label_left = rx.cond(
-        end_pos > 95,  # If the end is near the right edge
-        "100%", 
+        end_pos > 95,  # If the bar ends near the right edge
+        f"{end_pos}%",
         f"{end_pos}%",
     )
     end_label_transform = rx.cond(
         end_pos > 95,
-        "translateX(-100%)",  # Move left so the label stays within bounds
-        "translateX(0%)",  # No transform, so the left edge of the label aligns with the bar's end
+        "translateX(-100%)",  # Shift left if at the right edge
+        "translateX(0%)",
     )
 
-    # Align labels vertically with the bar
-    label_top = "0px"  # Align with the top of the bar
-    label_height = "20px"  # Match the bar height
-    label_line_height = "20px"  # Center the text vertically within the label
-
-    # For short tasks, adjust positioning to prevent overlap
-    start_label_left_adjusted = rx.cond(
-        (end_pos - start_pos) < 10,  # If the task is very short
-        f"{start_percent}%",  # Keep it at the start
-        start_label_left,
-    )
-    end_label_left_adjusted = rx.cond(
-        (end_pos - start_pos) < 10,
-        f"{end_pos}%",  # Keep it at the end
-        end_label_left,
-    )
-
-    # Ensure labels are aligned properly with the bar's edges
-    start_label_text_align = rx.cond(
-        start_pos < 5,
-        "left",  # Align left if near the left edge
-        "right",  # Align right so the label's right edge is flush with the bar's start
-    )
-    end_label_text_align = rx.cond(
-        end_pos > 95,
-        "right",  # Align right if near the right edge
-        "left",  # Align left so the label's left edge is flush with the bar's end
+    # Adjust for short bars to prevent overlap
+    label_top = rx.cond(
+        (end_pos - start_pos) < 5,  # If the bar is very short
+        "-50px",  # Place the end date higher to avoid overlap
+        "-30px",
     )
 
     return rx.hstack(
@@ -119,12 +94,9 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
                     background_color="#333",
                     border_radius="3px",
                     position="absolute",
-                    top=label_top,  # Align with the top of the bar
-                    height=label_height,  # Match the bar height
-                    line_height=label_line_height,  # Center text vertically
-                    left=start_label_left_adjusted,
+                    top="-30px",
+                    left=start_label_left,
                     transform=start_label_transform,
-                    text_align=start_label_text_align,
                     white_space="nowrap",
                     display=rx.cond(
                         (TooltipState.visible) & (TooltipState.hovered_task_id == task_id),
@@ -142,12 +114,9 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
                     background_color="#333",
                     border_radius="3px",
                     position="absolute",
-                    top=label_top,  # Align with the top of the bar
-                    height=label_height,  # Match the bar height
-                    line_height=label_line_height,  # Center text vertically
-                    left=end_label_left_adjusted,
+                    top=label_top,
+                    left=end_label_left,
                     transform=end_label_transform,
-                    text_align=end_label_text_align,
                     white_space="nowrap",
                     display=rx.cond(
                         (TooltipState.visible) & (TooltipState.hovered_task_id == task_id),
