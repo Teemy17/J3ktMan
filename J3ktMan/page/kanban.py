@@ -14,6 +14,7 @@ from J3ktMan.crud.tasks import (
     ExistingStatusNameError,
     ExistingTaskNameError,
     MilestoneCreate,
+    delete_status,
     assign_milestone,
     create_milestone,
     create_status,
@@ -226,6 +227,35 @@ class State(rx.State):
                     position="top-center",
                 )
             ]
+
+    @rx.event
+    def delete_status(
+        self, status_id: int, migration_status_id: int
+    ) -> list[EventSpec]:
+        if status_id not in self.statuses_by_id:
+            return []
+
+        # delete status
+        affecting_tasks = delete_status(status_id, migration_status_id)
+
+        # remove status from state
+        deleted_status_name = self.statuses_by_id[status_id].model.name
+        del self.statuses_by_id[status_id]
+
+        # remove tasks from state
+        for affecting_task in affecting_tasks:
+            self.tasks_by_id[affecting_task.id].model = affecting_task
+
+            self.statuses_by_id[migration_status_id].task_ids.append(
+                affecting_task.id
+            )
+
+        return [
+            rx.toast.success(
+                f"Status {deleted_status_name} has been deleted",
+                position="top-center",
+            )
+        ]
 
     @rx.event
     def cancel_task(self) -> None:
@@ -782,6 +812,26 @@ class StatusDeleteDialogState(rx.State):
     async def set_migration_status(self, status_id: int | None) -> None:
         self.migration_status_id = status_id
 
+    @rx.event
+    async def confirm_delete_status(self) -> list[EventSpec]:
+        if self.deleting_status_id is None or self.migration_status_id is None:
+            return [
+                rx.toast.error(
+                    "Please select a status to move the tasks to",
+                    position="top-center",
+                )
+            ]
+
+        state = await self.get_state(State)
+        result = state.delete_status(
+            self.deleting_status_id, self.migration_status_id
+        )
+
+        self.deleting_status_id = None
+        self.migration_status_id = None
+
+        return result
+
 
 def migration_status_button(
     st: Status,
@@ -903,20 +953,23 @@ def delete_status_dialog(st: Status) -> rx.Component:
                     class_name="self-center",
                     width="100%",
                 ),
-                rx.hstack(
-                    rx.button(
-                        "Cancel",
-                        variant="soft",
-                        color_scheme="gray",
-                        auto_focus=False,
+                rx.dialog.close(
+                    rx.hstack(
+                        rx.button(
+                            "Cancel",
+                            variant="soft",
+                            color_scheme="gray",
+                            auto_focus=False,
+                        ),
+                        rx.button(
+                            "Delete",
+                            variant="soft",
+                            color_scheme="red",
+                            auto_focus=False,
+                            on_click=StatusDeleteDialogState.confirm_delete_status,
+                        ),
+                        class_name="self-end items-center mt-1",
                     ),
-                    rx.button(
-                        "Delete",
-                        variant="soft",
-                        color_scheme="red",
-                        auto_focus=False,
-                    ),
-                    class_name="self-end items-center mt-1",
                 ),
             ),
         ),

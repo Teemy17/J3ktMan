@@ -541,3 +541,37 @@ def set_status(task_id: int, status_id: int) -> int:
         session.commit()
 
         return previous_status_id
+
+
+def delete_status(status_id: int, to_status_id: int) -> Sequence[Task]:
+    """
+    Deletes a status by its ID.
+
+    Chechs:
+    - Moves all tasks in the status to the given status ID
+    """
+    with rx.session() as session:
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        # get all tasks in the status
+        tasks = session.exec(
+            Task.select().where(Task.status_id == status_id)
+        ).all()
+
+        # move all tasks in the status to the given status ID
+        for task in tasks:
+            task.status_id = to_status_id
+            session.add(task)
+
+        session.delete(status)
+        session.commit()
+
+        for task in tasks:
+            session.refresh(task)
+
+        return tasks
