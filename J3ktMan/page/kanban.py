@@ -751,7 +751,13 @@ def task_card(task_id: int) -> rx.Component:
             draggable=True,
             cursor="pointer",
             width="100%",
-            class_name="round-sm hover:bg-gray-200 dark:hover:bg-zinc-800",
+            class_name=(  # type: ignore
+                "round-sm "
+                + rx.color_mode_cond(
+                    dark="hover:bg-zinc-800",
+                    light="hover:bg-gray-200",
+                )
+            ),
             on_drag_start=State.on_drag(task_id),
             on_drag_end=State.on_release,
         ),
@@ -778,7 +784,13 @@ def new_kanban_column() -> rx.Component:
         rx.divider(),
         width="300px",
         position="relative",
-        class_name="dark:bg-zinc-900 rounded-lg p-2 shadow-md",
+        class_name=(  # type: ignore
+            "rounded-lg p-2 shadow-md "
+            + rx.color_mode_cond(
+                dark="bg-zinc-900",
+                light="bg-gray-50",
+            )
+        ),
     )
 
 
@@ -1055,7 +1067,10 @@ def kanban_column(st: Status) -> rx.Component:
         ),
         width="300px",
         position="relative",
-        class_name="bg-gray-50 dark:bg-zinc-900 rounded-lg p-2 shadow-md",
+        class_name=(  # type: ignore
+            "rounded-lg p-2 shadow-md "
+            + rx.color_mode_cond(dark="bg-zinc-900", light="bg-gray-50")
+        ),
     )
 
 
@@ -1225,10 +1240,10 @@ def kanban_content() -> rx.Component:
                         ),
                     ),
                     gap="1rem",
+                    margin_bottom="1rem",
                 ),
                 type="scroll",
                 scrollbars="both",
-                padding_bottom="2rem",
                 grow="1",
             ),
             loading=State.is_loading,
