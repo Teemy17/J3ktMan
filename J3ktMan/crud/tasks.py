@@ -101,8 +101,28 @@ def set_task_description(task_id: int, new_description: str) -> Task:
 def rename_task(task_id: int, new_name: str) -> Task:
     with rx.session() as session:
         task = session.exec(Task.select().where(Task.id == task_id)).first()
+
         if task is None:
             raise InvalidTaskIDError()
+
+        parent_status = session.exec(
+            Status.select().where(Status.id == task.status_id)
+        ).first()
+
+        assert parent_status is not None
+
+        # check if there's a task with the same name in the same project
+        existing_task = session.exec(
+            Task.select()
+            .join(Status)
+            .where(
+                (Task.name == new_name)
+                & (Status.project_id == parent_status.project_id)
+            )
+        ).first()
+
+        if existing_task is not None:
+            raise ExistingTaskNameError()
 
         task.name = new_name
         session.add(task)
@@ -190,7 +210,22 @@ def create_task(
     - If there's a task with the same name in the same milestone
     """
     with rx.session() as session:
-        task = session.exec(Task.select().where((Task.name == name))).first()
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        project_id = status.project_id
+
+        # should have no same task name in the same project
+
+        task = session.exec(
+            Task.select()
+            .join(Status)
+            .where((Task.name == name) & (Status.project_id == project_id))
+        ).first()
 
         if task is not None:
             raise ExistingTaskNameError()
