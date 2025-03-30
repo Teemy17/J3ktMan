@@ -29,6 +29,7 @@ from J3ktMan.crud.tasks import (
 )
 from J3ktMan.model.project import Project
 from J3ktMan.component.base import base_page
+from J3ktMan.component.invite_member_dialog import invite_member_dialog
 from J3ktMan.crud.project import (
     InvalidProjectIDError,
     get_project,
@@ -927,11 +928,14 @@ def kanban_content() -> rx.Component:
                 rx.heading(State.project_name),
                 rx.spacer(),
                 rx.hstack(
-                    rx.icon_button(
-                        "external-link",
-                        variant="ghost",
-                        color_scheme="gray",
-                        size="2",
+                    invite_member_dialog(
+                        rx.icon_button(
+                            "external-link",
+                            variant="ghost",
+                            color_scheme="gray",
+                            size="2",
+                        ),
+                        State.page_data.project_id,  # type: ignore
                     ),
                     rx.icon_button(
                         "ellipsis",
@@ -999,6 +1003,7 @@ def kanban_content() -> rx.Component:
                 ),
                 type="scroll",
                 scrollbars="both",
+                padding_bottom="2rem",
                 grow="1",
             ),
             loading=State.is_loading,
