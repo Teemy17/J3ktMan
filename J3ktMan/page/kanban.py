@@ -768,14 +768,19 @@ class StatusDeleteDialogState(rx.State):
     @rx.var(cache=True)
     async def get_available_statuses(self) -> list[int]:
         if self.deleting_status_id is None:
-            print("early return")
             return []
 
         state = await self.get_state(State)
 
-        result = [status_id for status_id in state.statuses_by_id.keys()]
-        print(f"normal return {result}")
-        return result
+        return [
+            status_id
+            for status_id in state.statuses_by_id.keys()
+            if status_id != self.deleting_status_id
+        ]
+
+    @rx.event
+    async def set_migration_status(self, status_id: int | None) -> None:
+        self.migration_status_id = status_id
 
 
 def migration_status_button(
@@ -806,16 +811,20 @@ def migration_status_button(
         rx.menu.content(
             rx.foreach(
                 StatusDeleteDialogState.get_available_statuses,  # type: ignore
-                lambda milestone: rx.menu.item(
+                lambda status_id: rx.menu.item(
                     rx.icon("list-check", size=12),
-                    milestone,
+                    State.statuses_by_id[status_id].model.name,
                     cursor="pointer",
+                    on_click=StatusDeleteDialogState.set_migration_status(
+                        status_id
+                    ),
                 ),
             ),
             rx.menu.separator(),
             rx.menu.item(
                 "None",
                 color_scheme="gray",
+                on_click=StatusDeleteDialogState.set_migration_status(None),
             ),
         ),
     )
@@ -860,14 +869,15 @@ def delete_status_dialog(st: Status) -> rx.Component:
                             color_scheme="gray",
                             weight="bold",
                         ),
-                        rx.badge(
+                        rx.button(
                             st.model.name,
                             variant="soft",
                             color_scheme="red",
-                            size="2",
-                            padding="0.5rem",
+                            auto_focus=False,
+                            clickable=False,
                         ),
                         align_items="left",
+                        class_name="flex-1",
                     ),
                     rx.icon(
                         "move-right",
@@ -875,22 +885,21 @@ def delete_status_dialog(st: Status) -> rx.Component:
                         class_name="self-center",
                         margin_x="1rem",
                     ),
-                    rx.hstack(
-                        rx.vstack(
-                            rx.text(
-                                "Will be moved to",
-                                size="2",
-                                color_scheme="gray",
-                                weight="bold",
-                            ),
-                            migration_status_button(st),
-                            align_items="left",
+                    rx.vstack(
+                        rx.text(
+                            "Will be moved to",
+                            size="2",
+                            color_scheme="gray",
+                            weight="bold",
                         ),
+                        migration_status_button(st),
+                        align_items="left",
+                        class_name="flex-1",
                     ),
                     class_name="self-center",
+                    width="100%",
                 ),
             ),
-            width="fit-content",
         ),
         on_open_change=lambda e: StatusDeleteDialogState.set_status_delete_dialog(
             st.model.id, e
