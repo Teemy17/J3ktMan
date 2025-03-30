@@ -79,6 +79,9 @@ class State(rx.State):
     creating_status: bool = False
     """Whether the user is creating a status."""
 
+    filter_milestone_id: int | None = None
+    """The milestone ID that is being filtered by."""
+
     editing_status_name: EditingStatusName | None = None
 
     tasks_by_id: dict[int, Task] = {}
@@ -92,6 +95,10 @@ class State(rx.State):
     @rx.var(cache=False)
     def milestones(self) -> list[Milestone]:
         return [x for x in self.milestones_by_id.values()]
+
+    @rx.event
+    def set_filter_milestone_id(self, milestone_id: int | None) -> None:
+        self.filter_milestone_id = milestone_id
 
     @rx.event
     async def create_status(self, form_data) -> list[EventSpec] | None:
@@ -280,6 +287,7 @@ class State(rx.State):
         self.mouse_over = None
         self.creating_task_at = None
         self.creating_status = False
+        self.filter_milestone_id = None
 
         self.tasks_by_id = {}
         self.statuses_by_id = {}
@@ -511,7 +519,11 @@ def kanban() -> rx.Component:
 def milestone_menu_item(
     milestone: J3ktMan.model.tasks.Milestone,
 ) -> rx.Component:
-    return rx.menu.item(rx.icon("list-check", size=12), milestone.name)
+    return rx.menu.item(
+        rx.icon("list-check", size=12),
+        milestone.name,
+        on_click=State.set_filter_milestone_id(milestone.id),
+    )
 
 
 class TaskDialogState(rx.State):
@@ -720,50 +732,58 @@ def task_dialog(task_id: int) -> rx.Component:
 
 
 def task_card(task_id: int) -> rx.Component:
-    return rx.dialog(
-        draggable_card(
-            rx.dialog.trigger(
-                rx.vstack(
-                    rx.text(State.tasks_by_id[task_id].model.name),
-                    rx.text(
-                        State.tasks_by_id[task_id].model.description,
-                        size="2",
-                        color_scheme="gray",
-                    ),
-                    rx.badge(
-                        rx.icon("list-check", size=12),
-                        rx.cond(
-                            State.tasks_by_id[task_id].milestone_id,
-                            State.tasks_by_id[task_id].milestone_name,
-                            "No Milestone",
+    return rx.cond(
+        ~State.filter_milestone_id  # type: ignore
+        | (
+            State.filter_milestone_id
+            == State.tasks_by_id[task_id].milestone_id
+        )
+        | (TaskDialogState.editing_task_id == task_id),
+        rx.dialog(
+            draggable_card(
+                rx.dialog.trigger(
+                    rx.vstack(
+                        rx.text(State.tasks_by_id[task_id].model.name),
+                        rx.text(
+                            State.tasks_by_id[task_id].model.description,
+                            size="2",
+                            color_scheme="gray",
                         ),
-                        variant="soft",
-                        color_scheme=rx.cond(
-                            State.tasks_by_id[task_id].milestone_id,
-                            "indigo",
-                            "gray",
+                        rx.badge(
+                            rx.icon("list-check", size=12),
+                            rx.cond(
+                                State.tasks_by_id[task_id].milestone_id,
+                                State.tasks_by_id[task_id].milestone_name,
+                                "No Milestone",
+                            ),
+                            variant="soft",
+                            color_scheme=rx.cond(
+                                State.tasks_by_id[task_id].milestone_id,
+                                "indigo",
+                                "gray",
+                            ),
+                            cursor="pointer",
                         ),
-                        cursor="pointer",
                     ),
                 ),
+                variant="surface",
+                draggable=True,
+                cursor="pointer",
+                width="100%",
+                class_name=(  # type: ignore
+                    "round-sm "
+                    + rx.color_mode_cond(
+                        dark="hover:bg-zinc-800",
+                        light="hover:bg-gray-200",
+                    )
+                ),
+                on_drag_start=State.on_drag(task_id),
+                on_drag_end=State.on_release,
             ),
-            variant="surface",
-            draggable=True,
-            cursor="pointer",
-            width="100%",
-            class_name=(  # type: ignore
-                "round-sm "
-                + rx.color_mode_cond(
-                    dark="hover:bg-zinc-800",
-                    light="hover:bg-gray-200",
-                )
+            task_dialog(task_id),
+            on_open_change=lambda e: TaskDialogState.set_editing_task_id(
+                task_id, e
             ),
-            on_drag_start=State.on_drag(task_id),
-            on_drag_end=State.on_release,
-        ),
-        task_dialog(task_id),
-        on_open_change=lambda e: TaskDialogState.set_editing_task_id(
-            task_id, e
         ),
     )
 
@@ -1203,15 +1223,34 @@ def kanban_content() -> rx.Component:
                     rx.menu.trigger(
                         rx.button(
                             rx.icon("chevron-down"),
-                            rx.text("Milestone"),
-                            variant="ghost",
+                            rx.cond(
+                                State.filter_milestone_id,
+                                (
+                                    State.milestones_by_id[
+                                        State.filter_milestone_id
+                                    ].model.name  # type: ignore
+                                ),
+                                "All Milestones",
+                            ),
+                            variant=rx.cond(
+                                State.filter_milestone_id, "soft", "ghost"
+                            ),
                             weight="medium",
+                            color_scheme=rx.cond(
+                                State.filter_milestone_id, "indigo", "gray"
+                            ),
                         ),
                     ),
                     rx.menu.content(
                         rx.foreach(
                             State.milestones,
                             lambda e: milestone_menu_item(e.model),
+                        ),
+                        rx.menu.separator(),
+                        rx.menu.item(
+                            "None",
+                            color_scheme="gray",
+                            on_click=State.set_filter_milestone_id(None),
                         ),
                     ),
                     justify="end",
