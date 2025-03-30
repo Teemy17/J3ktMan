@@ -196,7 +196,7 @@ class State(rx.State):
         new_name = self.editing_status_name.name
 
         if (
-            self.statuses[status_id].model.name
+            self.statuses_by_id[status_id].model.name
             == self.editing_status_name.name
             or self.editing_status_name.name == ""
         ):
