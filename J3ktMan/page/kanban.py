@@ -22,6 +22,7 @@ from J3ktMan.crud.tasks import (
     get_milestones_by_project_id,
     get_statuses_by_project_id,
     get_tasks_by_status_id,
+    rename_status,
     rename_task,
     set_status,
     set_task_description,
@@ -56,6 +57,11 @@ class Milestone(rx.Base):
     model: J3ktMan.model.tasks.Milestone
 
 
+class EditingStatusName(rx.Base):
+    status_id: int
+    name: str
+
+
 class State(rx.State):
     page_data: PageData | None = None
 
@@ -70,6 +76,8 @@ class State(rx.State):
 
     creating_status: bool = False
     """Whether the user is creating a status."""
+
+    editing_status_name: EditingStatusName | None = None
 
     tasks_by_id: dict[int, Task] = {}
     statuses_by_id: dict[int, Status] = {}
@@ -124,6 +132,62 @@ class State(rx.State):
     @rx.event
     def set_status_creating_task(self, status_id: int) -> None:
         self.creating_task_at = status_id
+
+    @rx.event
+    def update_status_name(self, name: str) -> None:
+        if self.editing_status_name is None:
+            return
+
+        self.editing_status_name.name = name
+
+    @rx.event
+    def set_editing_status_name(self, status_id: int) -> None:
+        if status_id not in self.statuses_by_id:
+            return
+
+        self.editing_status_name = EditingStatusName(
+            status_id=status_id,
+            name=self.statuses_by_id[status_id].model.name,
+        )
+
+    @rx.event
+    def on_blur_editing_status_name(self) -> None:
+        self.editing_status_name = None
+
+    @rx.event
+    def confirm_update_status_name(self) -> list[EventSpec] | None:
+        if self.editing_status_name is None:
+            return
+
+        status_id = self.editing_status_name.status_id
+        new_name = self.editing_status_name.name
+
+        if (
+            self.statuses[status_id].model.name
+            == self.editing_status_name.name
+            or self.editing_status_name.name == ""
+        ):
+            return
+
+        try:
+            new_status_model = rename_status(status_id, new_name)
+            self.statuses_by_id[status_id].model = new_status_model
+
+            return [
+                rx.toast.success(
+                    "Status name has been updated", position="top-center"
+                ),
+            ]
+
+        except ExistingStatusNameError:
+            result = [
+                rx.toast.error(
+                    f"Status `{new_name}` already exists",
+                    position="top-center",
+                )
+            ]
+
+            return result
 
     @rx.event
     def create_task(self, form_data) -> list[EventSpec] | None:
@@ -235,7 +299,6 @@ class State(rx.State):
             ]
 
         except Exception:
-
             return [
                 rx.toast.error("Failed to rename task", position="top-center"),
             ]
@@ -493,7 +556,11 @@ def task_dialog(task_id: int) -> rx.Component:
                     TaskDialogState.is_editing_task_name,
                     rx.form(
                         rx.input(
-                            value=TaskDialogState.editing_task_name,
+                            value=rx.cond(
+                                TaskDialogState.editing_task_name,
+                                TaskDialogState.editing_task_name,
+                                "",
+                            ),
                             variant="soft",
                             background_color="transparent",
                             placeholder="Task Name",
@@ -687,10 +754,21 @@ def new_kanban_column() -> rx.Component:
 def kanban_column(st: Status) -> rx.Component:
     return rx.vstack(
         rx.hstack(
-            rx.input(
-                variant="soft",
-                background_color="transparent",
-                value=st.model.name,
+            rx.form(
+                rx.input(
+                    variant="soft",
+                    background_color="transparent",
+                    value=rx.cond(  # type:ignore
+                        State.editing_status_name  # type: ignore
+                        & (State.editing_status_name.status_id == st.model.id),  # type: ignore
+                        State.editing_status_name.name,  # type: ignore
+                        st.model.name,
+                    ),
+                    on_focus=State.set_editing_status_name(st.model.id),
+                    on_change=State.update_status_name,
+                    on_blur=State.on_blur_editing_status_name,
+                ),
+                on_submit=State.confirm_update_status_name.prevent_default,
             ),
             rx.spacer(),
             rx.icon_button(
@@ -751,7 +829,7 @@ def kanban_column(st: Status) -> rx.Component:
         ),
         width="300px",
         position="relative",
-        class_name="dark:bg-zinc-900 bg-gray-50 rounded-lg p-2 shadow-md",
+        class_name="bg-gray-50 dark:bg-zinc-900 rounded-lg p-2 shadow-md",
     )
 
 

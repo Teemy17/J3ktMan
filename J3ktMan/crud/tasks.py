@@ -95,7 +95,35 @@ def set_task_description(task_id: int, new_description: str) -> Task:
         session.commit()
         session.refresh(task)
 
-        return task
+    return task
+
+
+def rename_status(status_id: int, new_name: str) -> Status:
+    with rx.session() as session:
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        # check if there's a status with the same name in the same project
+        existing_status = session.exec(
+            Status.select().where(
+                (Status.name == new_name)
+                & (Status.project_id == status.project_id)
+            )
+        ).first()
+
+        if existing_status is not None:
+            raise ExistingStatusNameError()
+
+        status.name = new_name
+        session.add(status)
+        session.commit()
+        session.refresh(status)
+
+        return status
 
 
 def rename_task(task_id: int, new_name: str) -> Task:
