@@ -19,6 +19,7 @@ from J3ktMan.crud.tasks import (
     create_milestone,
     create_status,
     create_task,
+    delete_task,
     get_milestone_by_task_id,
     get_milestones_by_project_id,
     get_statuses_by_project_id,
@@ -158,6 +159,29 @@ class State(rx.State):
             status_id=status_id,
             name=self.statuses_by_id[status_id].model.name,
         )
+
+    @rx.event
+    def delete_task(self, task_id: int) -> list[EventSpec] | None:
+        if task_id not in self.tasks_by_id:
+            return
+
+        # delete task
+        delete_task(task_id)
+
+        # remove task from state
+        task_name = self.tasks_by_id[task_id].model.name
+        parent_status = self.tasks_by_id[task_id].model.status_id
+        del self.tasks_by_id[task_id]
+
+        # remove task from status
+        self.statuses_by_id[parent_status].task_ids.remove(task_id)
+
+        return [
+            rx.toast.success(
+                f'Task "{task_name}" has been deleted',
+                position="top-center",
+            )
+        ]
 
     @rx.event
     def on_blur_editing_status_name(self) -> None:
@@ -585,6 +609,20 @@ class TaskDialogState(rx.State):
 
         self.editing_task_description = None
 
+    @rx.event
+    async def delete_task(self) -> list[EventSpec] | None:
+        if self.editing_task_id is None:
+            return
+
+        state = await self.get_state(State)
+        result = state.delete_task(self.editing_task_id)
+
+        self.editing_task_id = None
+        self.editing_task_name = None
+        self.editing_task_description = None
+
+        return result
+
 
 def task_dialog(task_id: int) -> rx.Component:
     return rx.dialog.content(
@@ -664,6 +702,57 @@ def task_dialog(task_id: int) -> rx.Component:
                             color_scheme="gray",
                             on_click=State.assign_milestone(task_id, None),
                         ),
+                    ),
+                ),
+                rx.dialog.root(
+                    rx.dialog.trigger(
+                        rx.icon_button(
+                            "trash-2", color_scheme="gray", variant="ghost"
+                        )
+                    ),
+                    rx.dialog.content(
+                        rx.vstack(
+                            rx.hstack(
+                                rx.badge(
+                                    rx.icon(tag="trash-2"),
+                                    color_scheme="red",
+                                    radius="full",
+                                    padding="0.65rem",
+                                ),
+                                rx.vstack(
+                                    rx.heading(
+                                        f'Delete Task "{State.tasks_by_id[task_id].model.name}"',
+                                        size="4",
+                                    ),
+                                    rx.text(
+                                        "Are you sure you want to delete this task?",
+                                        size="2",
+                                    ),
+                                    spacing="1",
+                                    align_items="start",
+                                ),
+                                align_items="center",
+                                padding_bottom="1rem",
+                            ),
+                            rx.dialog.close(
+                                rx.hstack(
+                                    rx.button(
+                                        "Cancel",
+                                        variant="soft",
+                                        color_scheme="gray",
+                                        auto_focus=False,
+                                    ),
+                                    rx.button(
+                                        "Delete",
+                                        variant="soft",
+                                        color_scheme="red",
+                                        auto_focus=False,
+                                        on_click=TaskDialogState.delete_task(),
+                                    ),
+                                    class_name="self-end items-center mt-1",
+                                )
+                            ),
+                        )
                     ),
                 ),
                 align_items="center",
@@ -781,6 +870,7 @@ def task_card(task_id: int) -> rx.Component:
                 on_drag_end=State.on_release,
             ),
             task_dialog(task_id),
+            open=TaskDialogState.editing_task_id == task_id,
             on_open_change=lambda e: TaskDialogState.set_editing_task_id(
                 task_id, e
             ),
