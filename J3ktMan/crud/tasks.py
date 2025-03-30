@@ -305,6 +305,7 @@ def delete_task(task_id: int) -> None:
         dependencies = session.exec(
             TaskDependency.select().where(
                 (TaskDependency.dependency_id == task_id)
+                | (TaskDependency.dependant_id == task_id)
             )
         ).all()
 
