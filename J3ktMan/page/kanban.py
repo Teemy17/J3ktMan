@@ -789,7 +789,7 @@ def migration_status_button(
     return rx.menu.root(
         rx.menu.trigger(
             rx.button(
-                rx.fragment(
+                rx.hstack(
                     rx.cond(
                         StatusDeleteDialogState.migration_status_id,
                         State.statuses_by_id[  # type: ignore
@@ -797,14 +797,18 @@ def migration_status_button(
                         ].model.name,
                         "Select Status",
                     ),
+                    rx.spacer(),
                     rx.icon("chevron-down", size=12),
+                    width="100%",
+                    class_name="items-center self-center",
                 ),
-                variant="soft",
+                variant="outline",
                 color_scheme=rx.cond(
                     StatusDeleteDialogState.migration_status_id,
                     "indigo",
                     "gray",
                 ),
+                width="100%",
                 auto_focus=False,
             ),
         ),
@@ -812,7 +816,7 @@ def migration_status_button(
             rx.foreach(
                 StatusDeleteDialogState.get_available_statuses,  # type: ignore
                 lambda status_id: rx.menu.item(
-                    rx.icon("list-check", size=12),
+                    rx.icon("git-commit-horizontal", size=12),
                     State.statuses_by_id[status_id].model.name,
                     cursor="pointer",
                     on_click=StatusDeleteDialogState.set_migration_status(
@@ -871,7 +875,7 @@ def delete_status_dialog(st: Status) -> rx.Component:
                         ),
                         rx.button(
                             st.model.name,
-                            variant="soft",
+                            variant="outline",
                             color_scheme="red",
                             auto_focus=False,
                             clickable=False,
@@ -898,6 +902,21 @@ def delete_status_dialog(st: Status) -> rx.Component:
                     ),
                     class_name="self-center",
                     width="100%",
+                ),
+                rx.hstack(
+                    rx.button(
+                        "Cancel",
+                        variant="soft",
+                        color_scheme="gray",
+                        auto_focus=False,
+                    ),
+                    rx.button(
+                        "Delete",
+                        variant="soft",
+                        color_scheme="red",
+                        auto_focus=False,
+                    ),
+                    class_name="self-end items-center mt-1",
                 ),
             ),
         ),
