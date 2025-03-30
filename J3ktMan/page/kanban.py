@@ -752,6 +752,152 @@ def new_kanban_column() -> rx.Component:
     )
 
 
+class StatusDeleteDialogState(rx.State):
+    deleting_status_id: int | None = None
+    migration_status_id: int | None = None
+
+    @rx.event
+    def set_status_delete_dialog(self, status_id: int, e: bool) -> None:
+        if e:
+            self.deleting_status_id = status_id
+            self.migration_status_id = None
+        else:
+            self.deleting_status_id = None
+            self.migration_status_id = None
+
+    @rx.var(cache=True)
+    async def get_available_statuses(self) -> list[int]:
+        if self.deleting_status_id is None:
+            print("early return")
+            return []
+
+        state = await self.get_state(State)
+
+        result = [status_id for status_id in state.statuses_by_id.keys()]
+        print(f"normal return {result}")
+        return result
+
+
+def migration_status_button(
+    st: Status,
+) -> rx.Component:
+    return rx.menu.root(
+        rx.menu.trigger(
+            rx.button(
+                rx.fragment(
+                    rx.cond(
+                        StatusDeleteDialogState.migration_status_id,
+                        State.statuses_by_id[  # type: ignore
+                            StatusDeleteDialogState.migration_status_id
+                        ].model.name,
+                        "Select Status",
+                    ),
+                    rx.icon("chevron-down", size=12),
+                ),
+                variant="soft",
+                color_scheme=rx.cond(
+                    StatusDeleteDialogState.migration_status_id,
+                    "indigo",
+                    "gray",
+                ),
+                auto_focus=False,
+            ),
+        ),
+        rx.menu.content(
+            rx.foreach(
+                StatusDeleteDialogState.get_available_statuses,  # type: ignore
+                lambda milestone: rx.menu.item(
+                    rx.icon("list-check", size=12),
+                    milestone,
+                    cursor="pointer",
+                ),
+            ),
+            rx.menu.separator(),
+            rx.menu.item(
+                "None",
+                color_scheme="gray",
+            ),
+        ),
+    )
+
+
+def delete_status_dialog(st: Status) -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.trigger(
+            rx.icon_button(
+                "trash-2",
+                variant="ghost",
+                color_scheme="gray",
+                size="2",
+            ),
+        ),
+        rx.dialog.content(
+            rx.vstack(
+                rx.hstack(
+                    rx.badge(
+                        rx.icon(tag="trash-2"),
+                        color_scheme="red",
+                        radius="full",
+                        padding="0.65rem",
+                    ),
+                    rx.vstack(
+                        rx.heading("Delete Status", size="4"),
+                        rx.text(
+                            "Determine the status to move the tasks to",
+                            size="2",
+                        ),
+                        spacing="1",
+                        align_items="start",
+                    ),
+                    align_items="center",
+                    padding_bottom="1rem",
+                ),
+                rx.hstack(
+                    rx.vstack(
+                        rx.text(
+                            "Task in the status",
+                            size="2",
+                            color_scheme="gray",
+                            weight="bold",
+                        ),
+                        rx.badge(
+                            st.model.name,
+                            variant="soft",
+                            color_scheme="red",
+                            size="2",
+                            padding="0.5rem",
+                        ),
+                        align_items="left",
+                    ),
+                    rx.icon(
+                        "move-right",
+                        color_scheme="gray",
+                        class_name="self-center",
+                        margin_x="1rem",
+                    ),
+                    rx.hstack(
+                        rx.vstack(
+                            rx.text(
+                                "Will be moved to",
+                                size="2",
+                                color_scheme="gray",
+                                weight="bold",
+                            ),
+                            migration_status_button(st),
+                            align_items="left",
+                        ),
+                    ),
+                    class_name="self-center",
+                ),
+            ),
+            width="fit-content",
+        ),
+        on_open_change=lambda e: StatusDeleteDialogState.set_status_delete_dialog(
+            st.model.id, e
+        ),
+    )
+
+
 def kanban_column(st: Status) -> rx.Component:
     return rx.vstack(
         rx.hstack(
@@ -772,9 +918,7 @@ def kanban_column(st: Status) -> rx.Component:
                 on_submit=State.confirm_update_status_name.prevent_default,
             ),
             rx.spacer(),
-            rx.icon_button(
-                "ellipsis", variant="ghost", color_scheme="gray", size="2"
-            ),
+            delete_status_dialog(st),
             align="center",
             width="100%",
         ),
