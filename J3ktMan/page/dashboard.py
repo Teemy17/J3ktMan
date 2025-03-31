@@ -8,10 +8,13 @@ from J3ktMan.component.Dashboard.pie_chart import pie_chart
 from J3ktMan.component.Dashboard.dashboard_card import dashboard_card
 from J3ktMan.model.project import Project
 from J3ktMan.crud.project import get_project, is_in_project, InvalidProjectIDError
+from J3ktMan.component.protected import protected_page_with
+
 
 class PageData(rx.Base):
     project_id: int
     project: Project
+
 
 class State(rx.State):
     page_data: PageData | None = None
@@ -19,7 +22,7 @@ class State(rx.State):
     @rx.event
     async def load_project(self) -> None | list[EventSpec] | EventSpec:
         if self.page_data is not None:
-               return
+            return
 
         clerk_state = await self.get_state(clerk.ClerkState)
         if clerk_state.user_id is None:
@@ -36,6 +39,8 @@ class State(rx.State):
                         position="top-center",
                     ),
                 ]
+                self.page_data = PageData(project_id=project_id, project=project)
+
         except (KeyError, ValueError, InvalidProjectIDError):
             return [
                 rx.redirect("/"),
@@ -45,11 +50,30 @@ class State(rx.State):
                 ),
             ]
 
+    @rx.var(cache=True)
+    def is_loading(self) -> bool:
+        return self.page_data is None
+
+    @rx.event
+    def reset_state(self) -> None:
+        self.page_data = None
+
+
 @rx.page("project/dashboard/[project_id]")
+@protected_page_with(on_signed_in=State.load_project)
 def dashboard() -> rx.Component:
-    return base_page(
-        rx.vstack(
-            rx.text("Dashboard", size="7", weight="bold"),
+    return rx.fragment(
+        base_page(
+            dashboard_content(),
+        ),
+        on_unmount=State.reset_state,
+    )
+
+
+def dashboard_content() -> rx.Component:
+    return rx.vstack(
+        rx.text("Dashboard", size="7", weight="bold"),
+        rx.skeleton(
             rx.hstack(
                 rx.box(
                     dashboard_card(name="Completed Projects", icon="circle-check"),
@@ -65,7 +89,10 @@ def dashboard() -> rx.Component:
                 ),
                 width="100%",
             ),
-            rx.spacer(),
+            loading=State.is_loading,
+        ),
+        rx.spacer(),
+        rx.skeleton(
             rx.hstack(
                 rx.card(
                     rx.text("Priority Breakdown", size="5", weight="bold"),
@@ -88,7 +115,8 @@ def dashboard() -> rx.Component:
                 spacing="4",
                 width="100%",
             ),
-            width="100%",
-            spacing="4",
-        )
+            loading=State.is_loading,
+        ),
+        width="100%",
+        spacing="4",
     )
