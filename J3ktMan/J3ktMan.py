@@ -21,6 +21,6 @@ app.add_page(index)
 app.add_page(signin, route="signin/[[...slug]]")
 app.add_page(signup, route="signup/[[...slug]]")
 app.add_page(home, route="home")
-app.add_page(dashboard, route="dashboard")
+app.add_page(dashboard)
 
 app.add_page(join_project)

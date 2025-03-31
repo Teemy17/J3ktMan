@@ -88,6 +88,17 @@ def create_project(info: ProjectCreate) -> Project:
         return project
 
 
+
+def get_project(project_id: int) -> Project:
+    with rx.session() as session:
+        project = session.exec(Project.select().where(Project.id == project_id)).first()
+
+        if project is None:
+            raise InvalidProjectIDError()
+
+        return project
+
+
 def get_projects(user_id: str) -> Sequence[Project]:
     """Returns all the projects that the user is a member of."""
 
