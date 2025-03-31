@@ -14,20 +14,24 @@ from J3ktMan.crud.tasks import (
     ExistingStatusNameError,
     ExistingTaskNameError,
     MilestoneCreate,
+    delete_status,
     assign_milestone,
     create_milestone,
     create_status,
     create_task,
+    delete_task,
     get_milestone_by_task_id,
     get_milestones_by_project_id,
     get_statuses_by_project_id,
     get_tasks_by_status_id,
+    rename_status,
     rename_task,
     set_status,
     set_task_description,
 )
 from J3ktMan.model.project import Project
 from J3ktMan.component.base import base_page
+from J3ktMan.component.invite_member_dialog import invite_member_dialog
 from J3ktMan.crud.project import (
     InvalidProjectIDError,
     get_project,
@@ -56,6 +60,11 @@ class Milestone(rx.Base):
     model: J3ktMan.model.tasks.Milestone
 
 
+class EditingStatusName(rx.Base):
+    status_id: int
+    name: str
+
+
 class State(rx.State):
     page_data: PageData | None = None
 
@@ -71,6 +80,11 @@ class State(rx.State):
     creating_status: bool = False
     """Whether the user is creating a status."""
 
+    filter_milestone_id: int | None = None
+    """The milestone ID that is being filtered by."""
+
+    editing_status_name: EditingStatusName | None = None
+
     tasks_by_id: dict[int, Task] = {}
     statuses_by_id: dict[int, Status] = {}
     milestones_by_id: dict[int, Milestone] = {}
@@ -82,6 +96,10 @@ class State(rx.State):
     @rx.var(cache=False)
     def milestones(self) -> list[Milestone]:
         return [x for x in self.milestones_by_id.values()]
+
+    @rx.event
+    def set_filter_milestone_id(self, milestone_id: int | None) -> None:
+        self.filter_milestone_id = milestone_id
 
     @rx.event
     async def create_status(self, form_data) -> list[EventSpec] | None:
@@ -126,6 +144,85 @@ class State(rx.State):
         self.creating_task_at = status_id
 
     @rx.event
+    def update_status_name(self, name: str) -> None:
+        if self.editing_status_name is None:
+            return
+
+        self.editing_status_name.name = name
+
+    @rx.event
+    def set_editing_status_name(self, status_id: int) -> None:
+        if status_id not in self.statuses_by_id:
+            return
+
+        self.editing_status_name = EditingStatusName(
+            status_id=status_id,
+            name=self.statuses_by_id[status_id].model.name,
+        )
+
+    @rx.event
+    def delete_task(self, task_id: int) -> list[EventSpec] | None:
+        if task_id not in self.tasks_by_id:
+            return
+
+        # delete task
+        delete_task(task_id)
+
+        # remove task from state
+        task_name = self.tasks_by_id[task_id].model.name
+        parent_status = self.tasks_by_id[task_id].model.status_id
+        del self.tasks_by_id[task_id]
+
+        # remove task from status
+        self.statuses_by_id[parent_status].task_ids.remove(task_id)
+
+        return [
+            rx.toast.success(
+                f'Task "{task_name}" has been deleted',
+                position="top-center",
+            )
+        ]
+
+    @rx.event
+    def on_blur_editing_status_name(self) -> None:
+        self.editing_status_name = None
+
+    @rx.event
+    def confirm_update_status_name(self) -> list[EventSpec] | None:
+        if self.editing_status_name is None:
+            return
+
+        status_id = self.editing_status_name.status_id
+        new_name = self.editing_status_name.name
+
+        if (
+            self.statuses_by_id[status_id].model.name
+            == self.editing_status_name.name
+            or self.editing_status_name.name == ""
+        ):
+            return
+
+        try:
+            new_status_model = rename_status(status_id, new_name)
+            self.statuses_by_id[status_id].model = new_status_model
+
+            return [
+                rx.toast.success(
+                    "Status name has been updated", position="top-center"
+                ),
+            ]
+
+        except ExistingStatusNameError:
+            result = [
+                rx.toast.error(
+                    f"Status `{new_name}` already exists",
+                    position="top-center",
+                )
+            ]
+
+            return result
+
+    @rx.event
     def create_task(self, form_data) -> list[EventSpec] | None:
         if self.creating_task_at is None:
             return
@@ -163,6 +260,35 @@ class State(rx.State):
             ]
 
     @rx.event
+    def delete_status(
+        self, status_id: int, migration_status_id: int
+    ) -> list[EventSpec]:
+        if status_id not in self.statuses_by_id:
+            return []
+
+        # delete status
+        affecting_tasks = delete_status(status_id, migration_status_id)
+
+        # remove status from state
+        deleted_status_name = self.statuses_by_id[status_id].model.name
+        del self.statuses_by_id[status_id]
+
+        # remove tasks from state
+        for affecting_task in affecting_tasks:
+            self.tasks_by_id[affecting_task.id].model = affecting_task
+
+            self.statuses_by_id[migration_status_id].task_ids.append(
+                affecting_task.id
+            )
+
+        return [
+            rx.toast.success(
+                f"Status {deleted_status_name} has been deleted",
+                position="top-center",
+            )
+        ]
+
+    @rx.event
     def cancel_task(self) -> None:
         self.creating_task_at = None
 
@@ -185,6 +311,7 @@ class State(rx.State):
         self.mouse_over = None
         self.creating_task_at = None
         self.creating_status = False
+        self.filter_milestone_id = None
 
         self.tasks_by_id = {}
         self.statuses_by_id = {}
@@ -235,7 +362,6 @@ class State(rx.State):
             ]
 
         except Exception:
-
             return [
                 rx.toast.error("Failed to rename task", position="top-center"),
             ]
@@ -417,7 +543,11 @@ def kanban() -> rx.Component:
 def milestone_menu_item(
     milestone: J3ktMan.model.tasks.Milestone,
 ) -> rx.Component:
-    return rx.menu.item(rx.icon("list-check", size=12), milestone.name)
+    return rx.menu.item(
+        rx.icon("list-check", size=12),
+        milestone.name,
+        on_click=State.set_filter_milestone_id(milestone.id),
+    )
 
 
 class TaskDialogState(rx.State):
@@ -479,6 +609,20 @@ class TaskDialogState(rx.State):
 
         self.editing_task_description = None
 
+    @rx.event
+    async def delete_task(self) -> list[EventSpec] | None:
+        if self.editing_task_id is None:
+            return
+
+        state = await self.get_state(State)
+        result = state.delete_task(self.editing_task_id)
+
+        self.editing_task_id = None
+        self.editing_task_name = None
+        self.editing_task_description = None
+
+        return result
+
 
 def task_dialog(task_id: int) -> rx.Component:
     return rx.dialog.content(
@@ -493,7 +637,11 @@ def task_dialog(task_id: int) -> rx.Component:
                     TaskDialogState.is_editing_task_name,
                     rx.form(
                         rx.input(
-                            value=TaskDialogState.editing_task_name,
+                            value=rx.cond(
+                                TaskDialogState.editing_task_name,
+                                TaskDialogState.editing_task_name,
+                                "",
+                            ),
                             variant="soft",
                             background_color="transparent",
                             placeholder="Task Name",
@@ -554,6 +702,57 @@ def task_dialog(task_id: int) -> rx.Component:
                             color_scheme="gray",
                             on_click=State.assign_milestone(task_id, None),
                         ),
+                    ),
+                ),
+                rx.dialog.root(
+                    rx.dialog.trigger(
+                        rx.icon_button(
+                            "trash-2", color_scheme="gray", variant="ghost"
+                        )
+                    ),
+                    rx.dialog.content(
+                        rx.vstack(
+                            rx.hstack(
+                                rx.badge(
+                                    rx.icon(tag="trash-2"),
+                                    color_scheme="red",
+                                    radius="full",
+                                    padding="0.65rem",
+                                ),
+                                rx.vstack(
+                                    rx.heading(
+                                        f'Delete Task "{State.tasks_by_id[task_id].model.name}"',
+                                        size="4",
+                                    ),
+                                    rx.text(
+                                        "Are you sure you want to delete this task?",
+                                        size="2",
+                                    ),
+                                    spacing="1",
+                                    align_items="start",
+                                ),
+                                align_items="center",
+                                padding_bottom="1rem",
+                            ),
+                            rx.dialog.close(
+                                rx.hstack(
+                                    rx.button(
+                                        "Cancel",
+                                        variant="soft",
+                                        color_scheme="gray",
+                                        auto_focus=False,
+                                    ),
+                                    rx.button(
+                                        "Delete",
+                                        variant="soft",
+                                        color_scheme="red",
+                                        auto_focus=False,
+                                        on_click=TaskDialogState.delete_task(),
+                                    ),
+                                    class_name="self-end items-center mt-1",
+                                )
+                            ),
+                        )
                     ),
                 ),
                 align_items="center",
@@ -622,44 +821,59 @@ def task_dialog(task_id: int) -> rx.Component:
 
 
 def task_card(task_id: int) -> rx.Component:
-    return rx.dialog(
-        draggable_card(
-            rx.dialog.trigger(
-                rx.vstack(
-                    rx.text(State.tasks_by_id[task_id].model.name),
-                    rx.text(
-                        State.tasks_by_id[task_id].model.description,
-                        size="2",
-                        color_scheme="gray",
-                    ),
-                    rx.badge(
-                        rx.icon("list-check", size=12),
-                        rx.cond(
-                            State.tasks_by_id[task_id].milestone_id,
-                            State.tasks_by_id[task_id].milestone_name,
-                            "No Milestone",
+    return rx.cond(
+        ~State.filter_milestone_id  # type: ignore
+        | (
+            State.filter_milestone_id
+            == State.tasks_by_id[task_id].milestone_id
+        )
+        | (TaskDialogState.editing_task_id == task_id),
+        rx.dialog(
+            draggable_card(
+                rx.dialog.trigger(
+                    rx.vstack(
+                        rx.text(State.tasks_by_id[task_id].model.name),
+                        rx.text(
+                            State.tasks_by_id[task_id].model.description,
+                            size="2",
+                            color_scheme="gray",
                         ),
-                        variant="soft",
-                        color_scheme=rx.cond(
-                            State.tasks_by_id[task_id].milestone_id,
-                            "indigo",
-                            "gray",
+                        rx.badge(
+                            rx.icon("list-check", size=12),
+                            rx.cond(
+                                State.tasks_by_id[task_id].milestone_id,
+                                State.tasks_by_id[task_id].milestone_name,
+                                "No Milestone",
+                            ),
+                            variant="soft",
+                            color_scheme=rx.cond(
+                                State.tasks_by_id[task_id].milestone_id,
+                                "indigo",
+                                "gray",
+                            ),
+                            cursor="pointer",
                         ),
-                        cursor="pointer",
                     ),
                 ),
+                variant="surface",
+                draggable=True,
+                cursor="pointer",
+                width="100%",
+                class_name=(  # type: ignore
+                    "round-sm "
+                    + rx.color_mode_cond(
+                        dark="hover:bg-zinc-800",
+                        light="hover:bg-gray-200",
+                    )
+                ),
+                on_drag_start=State.on_drag(task_id),
+                on_drag_end=State.on_release,
             ),
-            variant="surface",
-            draggable=True,
-            cursor="pointer",
-            width="100%",
-            class_name="round-sm hover:bg-gray-200 dark:hover:bg-zinc-800",
-            on_drag_start=State.on_drag(task_id),
-            on_drag_end=State.on_release,
-        ),
-        task_dialog(task_id),
-        on_open_change=lambda e: TaskDialogState.set_editing_task_id(
-            task_id, e
+            task_dialog(task_id),
+            open=TaskDialogState.editing_task_id == task_id,
+            on_open_change=lambda e: TaskDialogState.set_editing_task_id(
+                task_id, e
+            ),
         ),
     )
 
@@ -680,22 +894,234 @@ def new_kanban_column() -> rx.Component:
         rx.divider(),
         width="300px",
         position="relative",
-        class_name="dark:bg-zinc-900 rounded-lg p-2 shadow-md",
+        class_name=(  # type: ignore
+            "rounded-lg p-2 shadow-md "
+            + rx.color_mode_cond(
+                dark="bg-zinc-900",
+                light="bg-gray-50",
+            )
+        ),
+    )
+
+
+class StatusDeleteDialogState(rx.State):
+    deleting_status_id: int | None = None
+    migration_status_id: int | None = None
+
+    @rx.event
+    def set_status_delete_dialog(self, status_id: int, e: bool) -> None:
+        if e:
+            self.deleting_status_id = status_id
+            self.migration_status_id = None
+        else:
+            self.deleting_status_id = None
+            self.migration_status_id = None
+
+    @rx.var(cache=True)
+    async def get_available_statuses(self) -> list[int]:
+        if self.deleting_status_id is None:
+            return []
+
+        state = await self.get_state(State)
+
+        return [
+            status_id
+            for status_id in state.statuses_by_id.keys()
+            if status_id != self.deleting_status_id
+        ]
+
+    @rx.event
+    async def set_migration_status(self, status_id: int | None) -> None:
+        self.migration_status_id = status_id
+
+    @rx.event
+    async def confirm_delete_status(self) -> list[EventSpec]:
+        if self.deleting_status_id is None or self.migration_status_id is None:
+            return [
+                rx.toast.error(
+                    "Please select a status to move the tasks to",
+                    position="top-center",
+                )
+            ]
+
+        state = await self.get_state(State)
+        result = state.delete_status(
+            self.deleting_status_id, self.migration_status_id
+        )
+
+        self.deleting_status_id = None
+        self.migration_status_id = None
+
+        return result
+
+
+def migration_status_button(
+    st: Status,
+) -> rx.Component:
+    return rx.menu.root(
+        rx.menu.trigger(
+            rx.button(
+                rx.hstack(
+                    rx.cond(
+                        StatusDeleteDialogState.migration_status_id,
+                        State.statuses_by_id[  # type: ignore
+                            StatusDeleteDialogState.migration_status_id
+                        ].model.name,
+                        "Select Status",
+                    ),
+                    rx.spacer(),
+                    rx.icon("chevron-down", size=12),
+                    width="100%",
+                    class_name="items-center self-center",
+                ),
+                variant="outline",
+                color_scheme=rx.cond(
+                    StatusDeleteDialogState.migration_status_id,
+                    "indigo",
+                    "gray",
+                ),
+                width="100%",
+                auto_focus=False,
+            ),
+        ),
+        rx.menu.content(
+            rx.foreach(
+                StatusDeleteDialogState.get_available_statuses,  # type: ignore
+                lambda status_id: rx.menu.item(
+                    rx.icon("git-commit-horizontal", size=12),
+                    State.statuses_by_id[status_id].model.name,
+                    cursor="pointer",
+                    on_click=StatusDeleteDialogState.set_migration_status(
+                        status_id
+                    ),
+                ),
+            ),
+            rx.menu.separator(),
+            rx.menu.item(
+                "None",
+                color_scheme="gray",
+                on_click=StatusDeleteDialogState.set_migration_status(None),
+            ),
+        ),
+    )
+
+
+def delete_status_dialog(st: Status) -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.trigger(
+            rx.icon_button(
+                "trash-2",
+                variant="ghost",
+                color_scheme="gray",
+                size="2",
+            ),
+        ),
+        rx.dialog.content(
+            rx.vstack(
+                rx.hstack(
+                    rx.badge(
+                        rx.icon(tag="trash-2"),
+                        color_scheme="red",
+                        radius="full",
+                        padding="0.65rem",
+                    ),
+                    rx.vstack(
+                        rx.heading("Delete Status", size="4"),
+                        rx.text(
+                            "Determine the status to move the tasks to",
+                            size="2",
+                        ),
+                        spacing="1",
+                        align_items="start",
+                    ),
+                    align_items="center",
+                    padding_bottom="1rem",
+                ),
+                rx.hstack(
+                    rx.vstack(
+                        rx.text(
+                            "Task in the status",
+                            size="2",
+                            color_scheme="gray",
+                            weight="bold",
+                        ),
+                        rx.button(
+                            st.model.name,
+                            variant="outline",
+                            color_scheme="red",
+                            auto_focus=False,
+                            clickable=False,
+                        ),
+                        align_items="left",
+                        class_name="flex-1",
+                    ),
+                    rx.icon(
+                        "move-right",
+                        color_scheme="gray",
+                        class_name="self-center",
+                        margin_x="1rem",
+                    ),
+                    rx.vstack(
+                        rx.text(
+                            "Will be moved to",
+                            size="2",
+                            color_scheme="gray",
+                            weight="bold",
+                        ),
+                        migration_status_button(st),
+                        align_items="left",
+                        class_name="flex-1",
+                    ),
+                    class_name="self-center",
+                    width="100%",
+                ),
+                rx.dialog.close(
+                    rx.hstack(
+                        rx.button(
+                            "Cancel",
+                            variant="soft",
+                            color_scheme="gray",
+                            auto_focus=False,
+                        ),
+                        rx.button(
+                            "Delete",
+                            variant="soft",
+                            color_scheme="red",
+                            auto_focus=False,
+                            on_click=StatusDeleteDialogState.confirm_delete_status,
+                        ),
+                        class_name="self-end items-center mt-1",
+                    ),
+                ),
+            ),
+        ),
+        on_open_change=lambda e: StatusDeleteDialogState.set_status_delete_dialog(
+            st.model.id, e
+        ),
     )
 
 
 def kanban_column(st: Status) -> rx.Component:
     return rx.vstack(
         rx.hstack(
-            rx.input(
-                variant="soft",
-                background_color="transparent",
-                value=st.model.name,
+            rx.form(
+                rx.input(
+                    variant="soft",
+                    background_color="transparent",
+                    value=rx.cond(  # type:ignore
+                        State.editing_status_name  # type: ignore
+                        & (State.editing_status_name.status_id == st.model.id),  # type: ignore
+                        State.editing_status_name.name,  # type: ignore
+                        st.model.name,
+                    ),
+                    on_focus=State.set_editing_status_name(st.model.id),
+                    on_change=State.update_status_name,
+                    on_blur=State.on_blur_editing_status_name,
+                ),
+                on_submit=State.confirm_update_status_name.prevent_default,
             ),
             rx.spacer(),
-            rx.icon_button(
-                "ellipsis", variant="ghost", color_scheme="gray", size="2"
-            ),
+            delete_status_dialog(st),
             align="center",
             width="100%",
         ),
@@ -751,7 +1177,10 @@ def kanban_column(st: Status) -> rx.Component:
         ),
         width="300px",
         position="relative",
-        class_name="dark:bg-zinc-900 bg-gray-50 rounded-lg p-2 shadow-md",
+        class_name=(  # type: ignore
+            "rounded-lg p-2 shadow-md "
+            + rx.color_mode_cond(dark="bg-zinc-900", light="bg-gray-50")
+        ),
     )
 
 
@@ -849,11 +1278,14 @@ def kanban_content() -> rx.Component:
                 rx.heading(State.project_name),
                 rx.spacer(),
                 rx.hstack(
-                    rx.icon_button(
-                        "external-link",
-                        variant="ghost",
-                        color_scheme="gray",
-                        size="2",
+                    invite_member_dialog(
+                        rx.icon_button(
+                            "external-link",
+                            variant="ghost",
+                            color_scheme="gray",
+                            size="2",
+                        ),
+                        State.page_data.project_id,  # type: ignore
                     ),
                     rx.icon_button(
                         "ellipsis",
@@ -881,15 +1313,34 @@ def kanban_content() -> rx.Component:
                     rx.menu.trigger(
                         rx.button(
                             rx.icon("chevron-down"),
-                            rx.text("Milestone"),
-                            variant="ghost",
+                            rx.cond(
+                                State.filter_milestone_id,
+                                (
+                                    State.milestones_by_id[
+                                        State.filter_milestone_id
+                                    ].model.name  # type: ignore
+                                ),
+                                "All Milestones",
+                            ),
+                            variant=rx.cond(
+                                State.filter_milestone_id, "soft", "ghost"
+                            ),
                             weight="medium",
+                            color_scheme=rx.cond(
+                                State.filter_milestone_id, "indigo", "gray"
+                            ),
                         ),
                     ),
                     rx.menu.content(
                         rx.foreach(
                             State.milestones,
                             lambda e: milestone_menu_item(e.model),
+                        ),
+                        rx.menu.separator(),
+                        rx.menu.item(
+                            "None",
+                            color_scheme="gray",
+                            on_click=State.set_filter_milestone_id(None),
                         ),
                     ),
                     justify="end",
@@ -918,6 +1369,7 @@ def kanban_content() -> rx.Component:
                         ),
                     ),
                     gap="1rem",
+                    margin_bottom="1rem",
                 ),
                 type="scroll",
                 scrollbars="both",

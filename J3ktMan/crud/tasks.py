@@ -95,14 +95,62 @@ def set_task_description(task_id: int, new_description: str) -> Task:
         session.commit()
         session.refresh(task)
 
-        return task
+    return task
+
+
+def rename_status(status_id: int, new_name: str) -> Status:
+    with rx.session() as session:
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        # check if there's a status with the same name in the same project
+        existing_status = session.exec(
+            Status.select().where(
+                (Status.name == new_name)
+                & (Status.project_id == status.project_id)
+            )
+        ).first()
+
+        if existing_status is not None:
+            raise ExistingStatusNameError()
+
+        status.name = new_name
+        session.add(status)
+        session.commit()
+        session.refresh(status)
+
+        return status
 
 
 def rename_task(task_id: int, new_name: str) -> Task:
     with rx.session() as session:
         task = session.exec(Task.select().where(Task.id == task_id)).first()
+
         if task is None:
             raise InvalidTaskIDError()
+
+        parent_status = session.exec(
+            Status.select().where(Status.id == task.status_id)
+        ).first()
+
+        assert parent_status is not None
+
+        # check if there's a task with the same name in the same project
+        existing_task = session.exec(
+            Task.select()
+            .join(Status)
+            .where(
+                (Task.name == new_name)
+                & (Status.project_id == parent_status.project_id)
+            )
+        ).first()
+
+        if existing_task is not None:
+            raise ExistingTaskNameError()
 
         task.name = new_name
         session.add(task)
@@ -190,7 +238,22 @@ def create_task(
     - If there's a task with the same name in the same milestone
     """
     with rx.session() as session:
-        task = session.exec(Task.select().where((Task.name == name))).first()
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        project_id = status.project_id
+
+        # should have no same task name in the same project
+
+        task = session.exec(
+            Task.select()
+            .join(Status)
+            .where((Task.name == name) & (Status.project_id == project_id))
+        ).first()
 
         if task is not None:
             raise ExistingTaskNameError()
@@ -242,6 +305,7 @@ def delete_task(task_id: int) -> None:
         dependencies = session.exec(
             TaskDependency.select().where(
                 (TaskDependency.dependency_id == task_id)
+                | (TaskDependency.dependant_id == task_id)
             )
         ).all()
 
@@ -478,3 +542,37 @@ def set_status(task_id: int, status_id: int) -> int:
         session.commit()
 
         return previous_status_id
+
+
+def delete_status(status_id: int, to_status_id: int) -> Sequence[Task]:
+    """
+    Deletes a status by its ID.
+
+    Chechs:
+    - Moves all tasks in the status to the given status ID
+    """
+    with rx.session() as session:
+        status = session.exec(
+            Status.select().where(Status.id == status_id)
+        ).first()
+
+        if status is None:
+            raise InvalidStatusIDError()
+
+        # get all tasks in the status
+        tasks = session.exec(
+            Task.select().where(Task.status_id == status_id)
+        ).all()
+
+        # move all tasks in the status to the given status ID
+        for task in tasks:
+            task.status_id = to_status_id
+            session.add(task)
+
+        session.delete(status)
+        session.commit()
+
+        for task in tasks:
+            session.refresh(task)
+
+        return tasks
