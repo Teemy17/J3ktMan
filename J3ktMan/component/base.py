@@ -2,9 +2,9 @@ import reflex as rx
 from .navbar import navbar
 from .sidebar import sidebar
 
-def base_layout_component(child, *args, **kwargs) -> rx.Component:
+def base_layout_component(*children, **kwargs) -> rx.Component:
     """
-    A base layout component that wraps a child component in a layout with a navbar and sidebar.
+    A base layout component that wraps children components in a layout with a navbar and sidebar.
     """
     return rx.box(
         rx.vstack(
@@ -12,17 +12,20 @@ def base_layout_component(child, *args, **kwargs) -> rx.Component:
             rx.hstack(
                 sidebar(),
                 rx.box(
-                    child,
+                    rx.vstack(  # Wrap children in a vstack
+                        *children,  # Unpack all children here
+                        width="100%",
+                    ),
                     padding="1em",
                     flex="1",
                     width="100%",
-                    min_height="calc(100vh - 73px)",  
+                    min_height="calc(100vh - 73px)",
                     overflow_y="auto",
                 ),
                 spacing="0",
                 align="stretch",
                 width="100%",
-                height="calc(100vh - 73px)",  
+                height="calc(100vh - 73px)",
                 overflow="hidden",
             ),
             spacing="0",
@@ -34,5 +37,5 @@ def base_layout_component(child, *args, **kwargs) -> rx.Component:
         height="100vh",
     )
 
-def base_page(child: rx.Component, *args, **kwargs) -> rx.Component:
-    return base_layout_component(child, *args, **kwargs)
+def base_page(*children: rx.Component, **kwargs) -> rx.Component:
+    return base_layout_component(*children, **kwargs)
