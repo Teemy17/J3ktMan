@@ -88,10 +88,11 @@ def create_project(info: ProjectCreate) -> Project:
         return project
 
 
-
 def get_project(project_id: int) -> Project:
     with rx.session() as session:
-        project = session.exec(Project.select().where(Project.id == project_id)).first()
+        project = session.exec(
+            Project.select().where(Project.id == project_id)
+        ).first()
 
         if project is None:
             raise InvalidProjectIDError()

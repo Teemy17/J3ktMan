@@ -1,8 +1,11 @@
 from reflex_clerk import ClerkState
-from reflex.event import EventSpec
+from reflex.event import EventSpec, EventType
 
 import reflex_clerk as clerk
 import reflex as rx
+
+
+from J3ktMan.secret.clerk import PUBLISHABLE_KEY, SECRET_KEY
 
 
 class Redirect(rx.State):
@@ -74,6 +77,38 @@ The component requires the `clerk_provider` to be used in the parent component.
 """
 
 
+def protected_page_with(
+    on_signed_in: EventType[()] | None = None,
+    on_signed_out: EventType[()] | None = None,
+):
+    """
+    A decorator that wraps a page function to require the clerk user to be
+    signed in.
+
+    If the user is not signed in, the user will be redirected to the sign in
+    page.
+
+    The component will be wrapped in a `clerk_provider` component, therefore,
+    there should not be any `clerk_provider` in the component.
+    """
+
+    def dectorator(render_fn):
+        def wrapper(*args, **kwargs):
+            return clerk.clerk_provider(
+                protected(render_fn(*args, **kwargs)),
+                publishable_key=PUBLISHABLE_KEY,
+                secret_key=SECRET_KEY,
+                on_signed_in=on_signed_in,
+                on_signed_out=on_signed_out,
+            )
+
+        wrapper.__name__ = render_fn.__name__
+
+        return wrapper
+
+    return dectorator
+
+
 def protected_page(func):
     """
     A decorator that wraps a page function to require the clerk user to be
@@ -87,7 +122,11 @@ def protected_page(func):
     """
 
     def wrapper(*args, **kwargs):
-        return clerk.clerk_provider(protected(func(*args, **kwargs)))
+        return clerk.clerk_provider(
+            protected(func(*args, **kwargs)),
+            publishable_key=PUBLISHABLE_KEY,
+            secret_key=SECRET_KEY,
+        )
 
     wrapper.__name__ = func.__name__
 
