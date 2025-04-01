@@ -7,8 +7,10 @@ from J3ktMan.page.join_project import join_project
 from J3ktMan.page.kanban import kanban
 from J3ktMan.page.signup import signup
 from J3ktMan.page.signin import signin
+from J3ktMan.page.timeline import timeline_view
 from J3ktMan.page.home import home
 from J3ktMan.page.dashboard import dashboard
+
 
 # the following import is necessary to register the model with the database
 from J3ktMan.model import project  # noqa
@@ -25,4 +27,5 @@ app.add_page(home, route="home")
 app.add_page(dashboard)
 
 app.add_page(join_project)
+app.add_page(timeline_view)
 app.add_page(kanban)
