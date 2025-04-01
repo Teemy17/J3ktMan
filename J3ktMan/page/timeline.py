@@ -1,9 +1,18 @@
+import reflex_clerk as clerk
 import reflex as rx
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from J3ktMan.component import timeline, base
 from typing_extensions import TypedDict
+
+from J3ktMan.component.protected import protected_page_with
+import J3ktMan.model.project
+from J3ktMan.crud.project import (
+    InvalidProjectIDError,
+    get_project,
+    is_in_project,
+)
 
 
 def epoch_to_date(epoch: int) -> str:
@@ -211,7 +220,42 @@ class TimelineState(rx.State):
     current_date_position: float = 0.0
     hover_text: str = ""
 
-    def on_mount(self):
+    current_project_id: int | None = None
+    current_project: J3ktMan.model.project.Project | None = None
+
+    @rx.event
+    async def on_mount(self):
+        self.reset()
+
+        clerk_state = await self.get_state(clerk.ClerkState)
+        if clerk_state.user_id is None:
+            return
+
+        try:
+            project_id = int(self.router.page.params["project_id"])
+            project = get_project(project_id)
+
+            if not is_in_project(clerk_state.user_id, project_id):
+                return [
+                    rx.toast.error(
+                        "You are not authorized to view this project",
+                        position="top-center",
+                    ),
+                    rx.redirect("/"),
+                ]
+
+            self.current_project_id = project_id
+            self.current_project = project
+
+        except (KeyError, ValueError, InvalidProjectIDError):  # noqa: F821
+            return [
+                rx.redirect("/"),
+                rx.toast.error(
+                    "Invalid project ID, Please try again",
+                    position="top-center",
+                ),
+            ]
+
         """Initialize all data when the component loads."""
         self.compute_months()
         self.compute_milestones()
@@ -566,7 +610,8 @@ def render_tasks():
     )
 
 
-@rx.page(route="/timeline")
+@rx.page(route="project/timeline/[project_id]")
+@protected_page_with(on_signed_in=TimelineState.on_mount)
 def timeline_view() -> rx.Component:
     return base.base_page(
         rx.fragment(
@@ -610,6 +655,5 @@ def timeline_view() -> rx.Component:
             padding="20",
             border="1px solid #ddd",
             border_radius="5",
-            on_mount=TimelineState.on_mount,  # type:ignore
         )
     )
