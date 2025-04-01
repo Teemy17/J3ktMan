@@ -375,8 +375,7 @@ class State(rx.State):
 
     @rx.event
     async def load_project(self) -> None | list[EventSpec] | EventSpec:
-        if self.page_data is not None:
-            return
+        self.reset()
 
         clerk_state = await self.get_state(clerk.ClerkState)
         if clerk_state.user_id is None:
@@ -536,7 +535,6 @@ def kanban() -> rx.Component:
         base_page(
             kanban_content(),
         ),
-        on_unmount=State.reset_state,
     )
 
 
@@ -1378,5 +1376,5 @@ def kanban_content() -> rx.Component:
             loading=State.is_loading,
         ),
         width="100%",
-        height="100%"
+        height="100%",
     )
