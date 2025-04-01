@@ -1377,6 +1377,6 @@ def kanban_content() -> rx.Component:
             ),
             loading=State.is_loading,
         ),
-        class_name="p-4",
-        background_color="gray-100",
+        width="100%",
+        height="100%"
     )
