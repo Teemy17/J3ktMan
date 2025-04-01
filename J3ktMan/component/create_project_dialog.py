@@ -9,7 +9,7 @@ from J3ktMan.crud.project import (
     TooShortProjectNameError,
     create_project,
 )
-
+from J3ktMan.state.home_state import HomeState
 
 class State(rx.State):
     @rx.event
@@ -28,6 +28,10 @@ class State(rx.State):
             create_project(
                 ProjectCreate(user_id=clerk_state.user_id, name=project_name)
             )
+
+            # Refresh the projects list
+            home_state = await self.get_state(HomeState)
+            home_state.refresh_projects()
 
             return rx.toast.info(
                 f"Project '{project_name}' created successfully."
