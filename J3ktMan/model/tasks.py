@@ -80,11 +80,11 @@ class Task(rx.Model, table=True):
     Priority of the task (LOW, MEDIUM, HIGH).
     """
 
-    start_date: int
+    start_date: int | None
     """
     Unix epoch timestamp of when the task starts.
     """
-    end_date: int
+    end_date: int | None
     """
     Unix epoch timestamp of when the task ends.
     """

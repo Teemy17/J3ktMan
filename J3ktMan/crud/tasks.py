@@ -264,6 +264,8 @@ def create_task(
             milestone_id=None,
             priority=priority,
             status_id=status_id,
+            start_date=None,
+            end_date=None,
         )
 
         session.add(new_task)
