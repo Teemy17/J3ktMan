@@ -304,19 +304,6 @@ class State(rx.State):
     def statuses(self) -> list[Status]:
         return [x for x in self.statuses_by_id.values()]
 
-    @rx.event
-    def reset_state(self) -> None:
-        self.page_data = None
-        self.dragging_task_id = None
-        self.mouse_over = None
-        self.creating_task_at = None
-        self.creating_status = False
-        self.filter_milestone_id = None
-
-        self.tasks_by_id = {}
-        self.statuses_by_id = {}
-        self.milestones_by_id = {}
-
     @rx.var(cache=False)
     def is_dragging(self) -> bool:
         value = self.dragging_task_id is not None
