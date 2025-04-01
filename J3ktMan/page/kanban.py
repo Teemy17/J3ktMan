@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import reflex_clerk as clerk
 from reflex.event import EventSpec
 import reflex as rx
 
@@ -10,31 +9,17 @@ from J3ktMan.component.drag_zone import drag_zone
 from J3ktMan.component.draggable_card import draggable_card
 from J3ktMan.component.protected import protected_page_with
 from J3ktMan.component.task_dialog import task_dialog, State as TaskDialogState
+from J3ktMan.state.project import State as ProjectState, Status
 from J3ktMan.component.create_milestone_dialog import (
     create_milestone_dialog,
     State as CreateMilestoneState,
 )
 from J3ktMan.crud.tasks import (
-    ExistingStatusNameError,
-    ExistingTaskNameError,
     delete_status,
-    create_status,
-    create_task,
-    get_milestone_by_task_id,
-    get_milestones_by_project_id,
-    get_statuses_by_project_id,
-    get_tasks_by_status_id,
-    rename_status,
-    set_status,
 )
 from J3ktMan.model.project import Project
 from J3ktMan.component.base import base_page
 from J3ktMan.component.invite_member_dialog import invite_member_dialog
-from J3ktMan.crud.project import (
-    InvalidProjectIDError,
-    get_project,
-    is_in_project,
-)
 from J3ktMan.model.tasks import Priority
 
 
@@ -44,11 +29,6 @@ class Task(rx.Base):
     status_id: int
     milestone_id: int | None
     milestone_name: str | None
-
-
-class Status(rx.Base):
-    model: J3ktMan.model.tasks.Status
-    task_ids: list[int]
 
 
 class PageData(rx.Base):
@@ -66,8 +46,6 @@ class EditingStatusName(rx.Base):
 
 
 class State(rx.State):
-    page_data: PageData | None = None
-
     dragging_task_id: int | None = None
     """The task ID that is being dragged by."""
 
@@ -85,25 +63,9 @@ class State(rx.State):
 
     editing_status_name: EditingStatusName | None = None
 
-    tasks_by_id: dict[int, Task] = {}
-    statuses_by_id: dict[int, Status] = {}
-    milestones_by_id: dict[int, Milestone] = {}
-
     @rx.event
     def set_creating_status(self, value: bool) -> None:
         self.creating_status = value
-
-    @rx.var(cache=True)
-    def milestones(self) -> list[Milestone]:
-        return [x for x in self.milestones_by_id.values()]
-
-    @rx.var(cache=True)
-    def milestone_name_by_ids(self) -> dict[int, str]:
-        result = {}
-        for id, mil in self.milestones_by_id.items():
-            result[id] = mil.model.name
-
-        return result
 
     @rx.event
     def set_filter_milestone_id(self, milestone_id: int | None) -> None:
@@ -113,31 +75,12 @@ class State(rx.State):
     async def create_status(self, form_data) -> list[EventSpec] | None:
         status_name = str(form_data["status_name"])
 
-        if self.page_data is None:
-            return
+        project_state = await self.get_state(ProjectState)
+        result = project_state.create_status(status_name)
 
-        try:
-            status = create_status(status_name, "", self.page_data.project_id)
+        self.creating_status = False
 
-            self.creating_status = False
-            self.statuses_by_id[status.id] = Status(
-                model=status,
-                task_ids=[],
-            )
-
-            return [
-                rx.toast.success(
-                    f"Status {status_name} has been created",
-                    position="top-center",
-                )
-            ]
-        except ExistingStatusNameError:
-            return [
-                rx.toast.error(
-                    f"Status {status_name} already exists",
-                    position="top-center",
-                )
-            ]
+        return result
 
     @rx.event
     def set_mouse_over(self, status_id: int) -> None:
@@ -159,13 +102,14 @@ class State(rx.State):
         self.editing_status_name.name = name
 
     @rx.event
-    def set_editing_status_name(self, status_id: int) -> None:
-        if status_id not in self.statuses_by_id:
+    async def set_editing_status_name(self, status_id: int) -> None:
+        project_state = await self.get_state(ProjectState)
+        if project_state.data is None:
             return
 
         self.editing_status_name = EditingStatusName(
             status_id=status_id,
-            name=self.statuses_by_id[status_id].model.name,
+            name=project_state.data.statuses_by_id[status_id].name,
         )
 
     @rx.event
@@ -182,42 +126,34 @@ class State(rx.State):
         self.editing_status_name = None
 
     @rx.event
-    def confirm_update_status_name(self) -> list[EventSpec] | None:
+    async def confirm_update_status_name(self) -> list[EventSpec] | None:
         if self.editing_status_name is None:
+            return
+
+        project_state = await self.get_state(ProjectState)
+        if project_state.data is None:
             return
 
         status_id = self.editing_status_name.status_id
         new_name = self.editing_status_name.name
 
         if (
-            self.statuses_by_id[status_id].model.name
+            project_state.data.statuses_by_id[status_id].name
             == self.editing_status_name.name
             or self.editing_status_name.name == ""
         ):
             return
 
-        try:
-            new_status_model = rename_status(status_id, new_name)
-            self.statuses_by_id[status_id].model = new_status_model
+        project_state = await self.get_state(ProjectState)
+        result = project_state.rename_status(
+            status_id,
+            new_name,
+        )
 
-            return [
-                rx.toast.success(
-                    "Status name has been updated", position="top-center"
-                ),
-            ]
-
-        except ExistingStatusNameError:
-            result = [
-                rx.toast.error(
-                    f"Status `{new_name}` already exists",
-                    position="top-center",
-                )
-            ]
-
-            return result
+        return result
 
     @rx.event
-    def create_task(self, form_data) -> list[EventSpec] | None:
+    async def create_task(self, form_data) -> list[EventSpec] | None:
         if self.creating_task_at is None:
             return
 
@@ -226,36 +162,15 @@ class State(rx.State):
 
         task_name = str(form_data["task_name"])
 
-        if self.page_data is None:
-            return
+        project_state = await self.get_state(ProjectState)
+        result = project_state.create_task(
+            task_name,
+            "",
+            Priority.MEDIUM,
+            status_id,
+        )
 
-        try:
-            # create task
-            task = create_task(task_name, "", Priority.MEDIUM, status_id)
-
-            self.tasks_by_id[task.id] = Task(
-                name=task.name,
-                description=task.description,
-                status_id=task.status_id,
-                milestone_id=None,
-                milestone_name=None,
-            )
-            self.statuses_by_id[status_id].task_ids.append(task.id)
-
-            return [
-                rx.toast.success(
-                    f'Task "{task_name}" has been created',
-                    position="top-center",
-                )
-            ]
-
-        except ExistingTaskNameError:
-            return [
-                rx.toast.error(
-                    f'Task "{task_name}" already exists',
-                    position="top-center",
-                )
-            ]
+        return result
 
     @rx.event
     def delete_status(
@@ -291,16 +206,8 @@ class State(rx.State):
         self.creating_task_at = None
 
     @rx.var(cache=True)
-    def is_loading(self) -> bool:
-        return self.page_data is None
-
-    @rx.var(cache=True)
     def project_name(self) -> str | None:
         return self.page_data.project.name if self.page_data else None
-
-    @rx.var(cache=True)
-    def statuses(self) -> list[Status]:
-        return [x for x in self.statuses_by_id.values()]
 
     @rx.var(cache=False)
     def is_dragging(self) -> bool:
@@ -337,72 +244,6 @@ class State(rx.State):
     async def load_project(self) -> None | list[EventSpec] | EventSpec:
         self.reset()
 
-        clerk_state = await self.get_state(clerk.ClerkState)
-        if clerk_state.user_id is None:
-            return
-
-        try:
-            project_id = int(self.router.page.params["project_id"])
-            project = get_project(project_id)
-
-            if not is_in_project(clerk_state.user_id, project_id):
-                return [
-                    rx.toast.error(
-                        "You are not authorized to view this project",
-                        position="top-center",
-                    ),
-                ]
-
-            statuses = get_statuses_by_project_id(project_id)
-            for status in statuses:
-                self.statuses_by_id[status.id] = Status(
-                    model=status,
-                    task_ids=[],
-                )
-
-                tasks = get_tasks_by_status_id(status.id)
-                for task in tasks:
-                    task_milestone = get_milestone_by_task_id(task.id)
-                    self.tasks_by_id[task.id] = Task(
-                        name=task.name,
-                        description=task.description,
-                        status_id=task.status_id,
-                        milestone_id=(
-                            task_milestone.id
-                            if task_milestone is not None
-                            else None
-                        ),
-                        milestone_name=(
-                            task_milestone.name
-                            if task_milestone is not None
-                            else None
-                        ),
-                    )
-
-                    self.statuses_by_id[status.id].task_ids.append(task.id)
-
-            milestones = get_milestones_by_project_id(project_id)
-            for milestone in milestones:
-                self.milestones_by_id[milestone.id] = Milestone(
-                    model=milestone
-                )
-
-            new_page_data = PageData(
-                project_id=project_id,
-                project=project,
-            )
-
-            self.page_data = new_page_data
-
-        except (KeyError, ValueError, InvalidProjectIDError):
-            return [
-                rx.redirect("/"),
-                rx.toast.error(
-                    "Invalid project ID, Please try again",
-                    position="top-center",
-                ),
-            ]
-
     @rx.event
     def on_drag(self, task_id: int) -> None:
         self.dragging_task_id = task_id
@@ -412,26 +253,21 @@ class State(rx.State):
         self.dragging_task_id = None
 
     @rx.event
-    def on_drop(self) -> None:
-        if (
-            self.dragging_task_id is None
-            or self.page_data is None
-            or self.mouse_over is None
-        ):
+    async def on_drop(self) -> None:
+        if self.dragging_task_id is None or self.mouse_over is None:
             self.dragging_task_id = None
             self.mouse_over = None
             return
 
-        task_id = self.dragging_task_id
-        previous_status_id = set_status(self.dragging_task_id, self.mouse_over)
-        next_status_id = self.mouse_over
-
-        # remove the task from the previous status and add it to the next status
-        self.statuses_by_id[previous_status_id].task_ids.remove(task_id)
-        self.statuses_by_id[next_status_id].task_ids.append(task_id)
+        project_state = await self.get_state(ProjectState)
+        result = project_state.set_task_status(
+            self.dragging_task_id, self.mouse_over
+        )
 
         self.dragging_task_id = None
         self.mouse_over = None
+
+        return result
 
     @rx.event
     async def on_create_milestone(self):
@@ -462,9 +298,15 @@ class State(rx.State):
             else None
         )
 
+    @rx.event
+    def test(self):
+        print("test")
+
 
 @rx.page(route="project/kanban/[project_id]")
-@protected_page_with(on_signed_in=State.load_project)
+@protected_page_with(
+    on_signed_in=[State.load_project, ProjectState.load_project]
+)
 def kanban() -> rx.Component:
     return rx.fragment(
         base_page(
@@ -474,12 +316,12 @@ def kanban() -> rx.Component:
 
 
 def milestone_menu_item(
-    milestone: J3ktMan.model.tasks.Milestone,
+    milestone_id: int, milestone_name: str
 ) -> rx.Component:
     return rx.menu.item(
         rx.icon("list-check", size=12),
-        milestone.name,
-        on_click=State.set_filter_milestone_id(milestone.id),
+        milestone_name,
+        on_click=State.set_filter_milestone_id(milestone_id),
     )
 
 
@@ -488,29 +330,37 @@ def task_card(task_id: int) -> rx.Component:
         ~State.filter_milestone_id  # type: ignore
         | (
             State.filter_milestone_id
-            == State.tasks_by_id[task_id].milestone_id
+            == ProjectState.data.tasks_by_id[task_id].milestone_id  # type: ignore
         )
         | (TaskDialogState.editing_task_id == task_id),
         task_dialog(
             draggable_card(
                 rx.dialog.trigger(
                     rx.vstack(
-                        rx.text(State.tasks_by_id[task_id].name),
+                        rx.text(ProjectState.data.tasks_by_id[task_id].name),  # type: ignore
                         rx.text(
-                            State.tasks_by_id[task_id].description,
+                            ProjectState.data.tasks_by_id[task_id].description,  # type: ignore
                             size="2",
                             color_scheme="gray",
                         ),
                         rx.badge(
                             rx.icon("list-check", size=12),
                             rx.cond(
-                                State.tasks_by_id[task_id].milestone_id,
-                                State.tasks_by_id[task_id].milestone_name,
+                                ProjectState.data.tasks_by_id[  # type: ignore
+                                    task_id
+                                ].milestone_id,
+                                ProjectState.data.milestones_by_id[  # type: ignore
+                                    ProjectState.data.tasks_by_id[  # type: ignore
+                                        task_id
+                                    ].milestone_id
+                                ].name,
                                 "No Milestone",
                             ),
                             variant="soft",
                             color_scheme=rx.cond(
-                                State.tasks_by_id[task_id].milestone_id,
+                                ProjectState.data.tasks_by_id[  # type: ignore
+                                    task_id
+                                ].milestone_id,
                                 "indigo",
                                 "gray",
                             ),
@@ -532,12 +382,12 @@ def task_card(task_id: int) -> rx.Component:
                 on_drag_start=State.on_drag(task_id),
                 on_drag_end=State.on_release,
             ),
-            State.tasks_by_id[task_id].name,
-            State.tasks_by_id[task_id].description,
-            State.tasks_by_id[task_id].milestone_id,
-            State.milestone_name_by_ids,
+            ProjectState.data.tasks_by_id[task_id].name,  # type: ignore
+            ProjectState.data.tasks_by_id[task_id].description,  # type: ignore
+            ProjectState.data.tasks_by_id[task_id].milestone_id,  # type: ignore
+            ProjectState.milestone_name_by_ids,
             task_id,
-            on_task_name_edit=State.on_task_name_edit,
+            on_task_name_edit=State.on_task_name_edit,  # type: ignore # type: ignore
             on_task_description_edit=State.on_task_description_edit,
             on_assign_milestone=State.assign_milestone,
             on_delete_task=State.delete_task(task_id),
@@ -589,11 +439,13 @@ class StatusDeleteDialogState(rx.State):
         if self.deleting_status_id is None:
             return []
 
-        state = await self.get_state(State)
+        state = await self.get_state(ProjectState)
+        if state.data is None:
+            return []
 
         return [
             status_id
-            for status_id in state.statuses_by_id.keys()
+            for status_id in state.data.statuses_by_id.keys()  # type: ignore
             if status_id != self.deleting_status_id
         ]
 
@@ -629,9 +481,9 @@ def migration_status_button() -> rx.Component:
                 rx.hstack(
                     rx.cond(
                         StatusDeleteDialogState.migration_status_id,
-                        State.statuses_by_id[  # type: ignore
+                        ProjectState.data.statuses_by_id[  # type: ignore
                             StatusDeleteDialogState.migration_status_id
-                        ].model.name,
+                        ].name,
                         "Select Status",
                     ),
                     rx.spacer(),
@@ -654,7 +506,9 @@ def migration_status_button() -> rx.Component:
                 StatusDeleteDialogState.get_available_statuses,  # type: ignore
                 lambda status_id: rx.menu.item(
                     rx.icon("git-commit-horizontal", size=12),
-                    State.statuses_by_id[status_id].model.name,
+                    ProjectState.data.statuses_by_id[  # type: ignore
+                        status_id
+                    ].name,
                     cursor="pointer",
                     on_click=StatusDeleteDialogState.set_migration_status(
                         status_id
@@ -711,7 +565,7 @@ def delete_status_dialog(st: Status) -> rx.Component:
                             weight="bold",
                         ),
                         rx.button(
-                            st.model.name,
+                            st.name,
                             variant="outline",
                             color_scheme="red",
                             auto_focus=False,
@@ -761,7 +615,7 @@ def delete_status_dialog(st: Status) -> rx.Component:
             ),
         ),
         on_open_change=lambda e: StatusDeleteDialogState.set_status_delete_dialog(
-            st.model.id, e
+            st.id, e
         ),
     )
 
@@ -775,11 +629,11 @@ def kanban_column(st: Status) -> rx.Component:
                     background_color="transparent",
                     value=rx.cond(  # type:ignore
                         State.editing_status_name  # type: ignore
-                        & (State.editing_status_name.status_id == st.model.id),  # type: ignore
+                        & (State.editing_status_name.status_id == st.id),  # type: ignore
                         State.editing_status_name.name,  # type: ignore
-                        st.model.name,
+                        st.name,
                     ),
-                    on_focus=State.set_editing_status_name(st.model.id),
+                    on_focus=State.set_editing_status_name(st.id),
                     on_change=State.update_status_name,
                     on_blur=State.on_blur_editing_status_name,
                 ),
@@ -794,7 +648,7 @@ def kanban_column(st: Status) -> rx.Component:
         rx.vstack(
             rx.foreach(st.task_ids, task_card),
             rx.cond(
-                State.mouse_over == st.model.id,
+                State.mouse_over == st.id,
                 rx.box(
                     height="5rem",
                     width="100%",
@@ -805,7 +659,7 @@ def kanban_column(st: Status) -> rx.Component:
                 ),
             ),
             rx.cond(
-                State.creating_task_at == st.model.id,
+                State.creating_task_at == st.id,
                 rx.card(
                     rx.form(
                         rx.input(
@@ -826,7 +680,7 @@ def kanban_column(st: Status) -> rx.Component:
                     color_scheme="gray",
                     size="2",
                     margin="0.25rem",
-                    on_click=State.set_status_creating_task(st.model.id),
+                    on_click=State.set_status_creating_task(st.id),
                 ),
             ),
             width="100%",
@@ -835,7 +689,7 @@ def kanban_column(st: Status) -> rx.Component:
             position="absolute",
             width=rx.cond(State.is_dragging, "100%", "0"),
             height=rx.cond(State.is_dragging, "100%", "0"),
-            on_drag_enter=State.set_mouse_over(st.model.id),
+            on_drag_enter=State.set_mouse_over(st.id),
             on_drag_leave=State.remove_mouse_over,
             on_drag_over=rx.prevent_default,
             on_drop=State.on_drop,
@@ -853,7 +707,7 @@ def kanban_content() -> rx.Component:
     return rx.vstack(
         rx.skeleton(
             rx.hstack(
-                rx.heading(State.project_name),
+                rx.heading(ProjectState.data.project_name),  # type: ignore
                 rx.spacer(),
                 rx.hstack(
                     invite_member_dialog(
@@ -863,7 +717,7 @@ def kanban_content() -> rx.Component:
                             color_scheme="gray",
                             size="2",
                         ),
-                        State.page_data.project_id,  # type: ignore
+                        ProjectState.data.project_id,  # type: ignore
                     ),
                     rx.icon_button(
                         "ellipsis",
@@ -875,7 +729,7 @@ def kanban_content() -> rx.Component:
                 width="100%",
                 align="center",
             ),
-            loading=State.is_loading,
+            loading=~ProjectState.loaded,
         ),
         rx.skeleton(
             rx.hstack(
@@ -893,8 +747,6 @@ def kanban_content() -> rx.Component:
                         variant="soft",
                         color_scheme="mint",
                     ),
-                    State.page_data.project_id,  # type: ignore
-                    State.on_create_milestone,
                 ),
                 rx.menu.root(
                     rx.menu.trigger(
@@ -903,9 +755,9 @@ def kanban_content() -> rx.Component:
                             rx.cond(
                                 State.filter_milestone_id,
                                 (
-                                    State.milestones_by_id[
+                                    ProjectState.data.milestones_by_id[  # type: ignore
                                         State.filter_milestone_id
-                                    ].model.name  # type: ignore
+                                    ].name
                                 ),
                                 "All Milestones",
                             ),
@@ -920,8 +772,8 @@ def kanban_content() -> rx.Component:
                     ),
                     rx.menu.content(
                         rx.foreach(
-                            State.milestones,
-                            lambda e: milestone_menu_item(e.model),
+                            ProjectState.milestones,
+                            lambda e: milestone_menu_item(e.id, e.name),
                         ),
                         rx.menu.separator(),
                         rx.menu.item(
@@ -937,12 +789,12 @@ def kanban_content() -> rx.Component:
                 margin_bottom="1rem",
                 align="center",
             ),
-            loading=State.is_loading,
+            loading=~ProjectState.loaded,
         ),
         rx.skeleton(
             rx.scroll_area(
                 rx.hstack(
-                    rx.foreach(State.statuses, kanban_column),
+                    rx.foreach(ProjectState.statuses, kanban_column),
                     rx.cond(
                         State.creating_status,
                         new_kanban_column(),
@@ -962,9 +814,8 @@ def kanban_content() -> rx.Component:
                 scrollbars="both",
                 grow="1",
             ),
-            loading=State.is_loading,
+            loading=~ProjectState.loaded,
         ),
         width="100%",
         height="100%",
     )
-

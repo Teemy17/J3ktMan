@@ -1,71 +1,17 @@
 from reflex.event import EventSpec
 import reflex as rx
 
-from J3ktMan.model.tasks import Milestone
-from J3ktMan.crud.tasks import (
-    ExistingMilestoneNameError,
-    MilestoneCreate,
-    create_milestone,
-)
+from J3ktMan.state.project import State as ProjectState
 
 
 class State(rx.State):
-    _last_created_milestone: Milestone | None = None
-    _project_id: int | None = None
-
-    @rx.var
-    def last_created_milestone(self) -> Milestone | None:
-        """
-        Obtains the milestone that was created by this dialog since the last
-        open and submission
-        """
-
-        return self._last_created_milestone
-
     @rx.event
-    def submit(self, form) -> list[EventSpec] | None:
+    async def submit(self, form) -> list[EventSpec] | None:
         name = str(form["name"])
         description = str(form["description"])
 
-        if self._project_id is None:
-            print(self._project_id)
-            return
-
-        try:
-            milestone = create_milestone(
-                MilestoneCreate(
-                    name=name,
-                    description=description,
-                    parent_project_id=self._project_id,
-                )
-            )
-
-            self._last_created_milestone = milestone
-
-            return [
-                rx.toast.success(
-                    f"Milestone {name} has been created",
-                    position="top-center",
-                ),
-            ]
-
-        except ExistingMilestoneNameError:
-            self._last_created_milestone = None
-
-            return [
-                rx.toast.error(
-                    f"Milestone {name} already exists",
-                    position="top-center",
-                ),
-            ]
-
-    @rx.event
-    def on_open_change(self, project_id: int, open: bool):
-        if open:
-            self.reset()
-
-        self._last_created_milestone = None
-        self._project_id = project_id
+        state = await self.get_state(ProjectState)
+        return state.create_milestone(name, description)
 
 
 def form_field(
@@ -92,7 +38,6 @@ def form_field(
 
 def create_milestone_dialog(
     trigger: rx.Component,
-    project_id: int,
     on_create_milestone=None,
 ) -> rx.Component:
     """
@@ -184,5 +129,4 @@ def create_milestone_dialog(
             width="fit-content",
             min_width="20rem",
         ),
-        on_open_change=lambda e: State.on_open_change(project_id, e),
     )
