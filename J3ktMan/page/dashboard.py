@@ -70,6 +70,10 @@ class State(rx.State):
         self.page_data = None
 
     @rx.var(cache=True)
+    def project_name(self) -> str | None:
+        return self.page_data.project.name if self.page_data else None
+
+    @rx.var(cache=True)
     def completed_tasks_count(self) -> int:
         if self.page_data is None:
             return 0
@@ -132,9 +136,9 @@ class State(rx.State):
     def priority_data(self) -> list:
         # Initialize with default structure
         result = [
-            {"name": "Low", "uv": 0},
-            {"name": "Medium", "uv": 0},
-            {"name": "High", "uv": 0},
+            {"name": "Low", "count": 0},
+            {"name": "Medium", "count": 0},
+            {"name": "High", "count": 0},
         ]
 
         if self.page_data is None:
@@ -159,9 +163,31 @@ class State(rx.State):
 
         # Update the default data with actual counts
         return [
-            {"name": priority, "uv": count}
+            {"name": priority, "count": count}
             for priority, count in priority_counts.items()
         ]
+
+    @rx.var(cache=True)
+    def status_data(self) -> list:
+        if self.page_data is None:
+            return []
+
+        statuses = get_statuses_by_project_id(self.page_data.project_id)
+
+        colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4CAF50", "#9966FF"]
+
+        result = []
+        for i, status in enumerate(statuses):
+            tasks = get_tasks_by_status_id(status.id)
+            result.append(
+                {
+                    "name": status.name,
+                    "value": len(tasks),
+                    "fill": colors[i % len(colors)],
+                }
+            )
+
+        return result
 
 
 @rx.page("project/dashboard/[project_id]")
@@ -177,12 +203,13 @@ def dashboard() -> rx.Component:
 
 def dashboard_content() -> rx.Component:
     return rx.vstack(
+        rx.heading(f"Project / {State.project_name}", size="5", weight="bold"),
         rx.text("Dashboard", size="7", weight="bold"),
         rx.skeleton(
             rx.hstack(
                 rx.box(
                     dashboard_card(
-                        name=f"Completed Tasks: {State.completed_tasks_count}",
+                        name=f"Completed Task: {State.completed_tasks_count}",
                         icon="circle-check",
                     ),
                     width="33%",
@@ -220,7 +247,7 @@ def dashboard_content() -> rx.Component:
                 rx.card(
                     rx.text("Status overview", size="5", weight="bold"),
                     rx.box(
-                        pie_chart(),
+                        pie_chart(data=State.status_data),
                     ),
                     padding="4",
                     height="300px",
