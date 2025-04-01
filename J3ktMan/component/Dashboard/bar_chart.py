@@ -1,13 +1,7 @@
 import reflex as rx
 
-data = [
-    {"name": "Low", "uv": 1},
-    {"name": "Medium", "uv": 2},
-    {"name": "High", "uv": 0},
-]
 
-
-def bar_chart() -> rx.Component:
+def bar_chart(data) -> rx.Component:
     return rx.recharts.bar_chart(
         rx.recharts.bar(
             data_key="uv",
