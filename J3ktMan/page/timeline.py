@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import pandas as pd
 import reflex as rx
-import reflex_clerk as clerk
 from typing_extensions import TypedDict
 
 import J3ktMan.model.project
@@ -12,11 +11,7 @@ from J3ktMan.component.create_milestone_dialog import create_milestone_dialog
 from J3ktMan.component.protected import protected_page_with
 from J3ktMan.component.task_dialog import task_dialog
 from J3ktMan.component.create_task_dialog import create_task_dialog
-from J3ktMan.crud.project import (
-    InvalidProjectIDError,
-    get_project,
-    is_in_project,
-)
+from J3ktMan.state.project import State as ProjectState
 from J3ktMan.utils import epoch_to_date
 
 
@@ -226,37 +221,6 @@ class TimelineState(rx.State):
 
     @rx.event
     async def on_mount(self):
-        self.reset()
-
-        clerk_state = await self.get_state(clerk.ClerkState)
-        if clerk_state.user_id is None:
-            return
-
-        try:
-            project_id = int(self.router.page.params["project_id"])
-            project = get_project(project_id)
-
-            if not is_in_project(clerk_state.user_id, project_id):
-                return [
-                    rx.toast.error(
-                        "You are not authorized to view this project",
-                        position="top-center",
-                    ),
-                    rx.redirect("/"),
-                ]
-
-            self.current_project_id = project_id
-            self.current_project = project
-
-        except (KeyError, ValueError, InvalidProjectIDError):  # noqa: F821
-            return [
-                rx.redirect("/"),
-                rx.toast.error(
-                    "Invalid project ID, Please try again",
-                    position="top-center",
-                ),
-            ]
-
         """Initialize all data when the component loads."""
         self.compute_months()
         self.compute_milestones()
@@ -539,7 +503,6 @@ def render_task_name():
                                         font_size="14px",
                                         font_weight="medium",
                                     ),
-
                                 ),
                                 task_id=task["id"],
                             ),
@@ -622,56 +585,63 @@ def render_tasks():
 
 
 @rx.page(route="project/timeline/[project_id]")
-@protected_page_with(on_signed_in=TimelineState.on_mount)
+@protected_page_with(
+    on_signed_in=[ProjectState.load_project, TimelineState.on_mount]
+)
 def timeline_view() -> rx.Component:
     return base.base_page(
-        rx.fragment(
-            rx.text("Project Timeline", class_name="text-3xl font-bold mb-20"),
-            rx.flex(
-                rx.box(
-                    render_task_name(),
-                    # Create new milestone button in the last row
-                    create_milestone_dialog(
-                        trigger=rx.button(
-                            rx.icon(tag="plus"),
-                            rx.text("Create New Milestone"),
-                        )
-                    ),
-                    width="200px",
-                    align_items="flex-start",
-                    height="auto",
+        rx.skeleton(
+            rx.fragment(
+                rx.text(
+                    "Project Timeline", class_name="text-3xl font-bold mb-20"
                 ),
-                rx.scroll_area(
-                    rx.vstack(
-                        rx.hstack(
-                            render_month_headers(),
-                            spacing="0",
-                            width="100%",
-                            overflow_x="auto",
+                rx.flex(
+                    rx.box(
+                        render_task_name(),
+                        # Create new milestone button in the last row
+                        create_milestone_dialog(
+                            trigger=rx.button(
+                                rx.icon(tag="plus"),
+                                rx.text("Create New Milestone"),
+                            )
                         ),
-                        render_tasks(),
-                        width="100%",
-                        spacing="0",
-                        align_items="stretch",
+                        width="200px",
+                        align_items="flex-start",
+                        height="auto",
                     ),
-                    width="calc(100% - 200px)",
+                    rx.scroll_area(
+                        rx.vstack(
+                            rx.hstack(
+                                render_month_headers(),
+                                spacing="0",
+                                width="100%",
+                                overflow_x="auto",
+                            ),
+                            render_tasks(),
+                            width="100%",
+                            spacing="0",
+                            align_items="stretch",
+                        ),
+                        width="calc(100% - 200px)",
+                        height="auto",
+                        overflow_x="auto",
+                        scrollbars="horizontal",
+                    ),
+                    direction="row",
+                    width="100%",
+                    align_items="stetch",
+                    spacing="0",
                     height="auto",
-                    overflow_x="auto",
-                    scrollbars="horizontal",
                 ),
-                direction="row",
                 width="100%",
-                align_items="stetch",
-                spacing="0",
-                height="auto",
+                align_items="stretch",
+                spacing="5",
+                max_width="1200px",
+                margin="auto",
+                padding="20",
+                border="1px solid #ddd",
+                border_radius="5",
             ),
-            width="100%",
-            align_items="stretch",
-            spacing="5",
-            max_width="1200px",
-            margin="auto",
-            padding="20",
-            border="1px solid #ddd",
-            border_radius="5",
+            loading=~ProjectState.loaded,
         )
     )
