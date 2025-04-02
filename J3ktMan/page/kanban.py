@@ -119,7 +119,7 @@ class State(rx.State):
         del self.tasks_by_id[task_id]
 
         # remove task from status
-        self.statuses_by_id[parent_status].task_ids.remove(task_id)
+        self.data.statuses_by_id[parent_status].task_ids.remove(task_id)
 
     @rx.event
     def on_blur_editing_status_name(self) -> None:
@@ -171,35 +171,6 @@ class State(rx.State):
         )
 
         return result
-
-    @rx.event
-    def delete_status(
-        self, status_id: int, migration_status_id: int
-    ) -> list[EventSpec]:
-        if status_id not in self.statuses_by_id:
-            return []
-
-        # delete status
-        affecting_tasks = delete_status(status_id, migration_status_id)
-
-        # remove status from state
-        deleted_status_name = self.statuses_by_id[status_id].model.name
-        del self.statuses_by_id[status_id]
-
-        # remove tasks from state
-        for affecting_task in affecting_tasks:
-            self.tasks_by_id[affecting_task.id].model = affecting_task
-
-            self.statuses_by_id[migration_status_id].task_ids.append(
-                affecting_task.id
-            )
-
-        return [
-            rx.toast.success(
-                f"Status {deleted_status_name} has been deleted",
-                position="top-center",
-            )
-        ]
 
     @rx.event
     def cancel_task(self) -> None:
@@ -445,7 +416,7 @@ class StatusDeleteDialogState(rx.State):
 
         return [
             status_id
-            for status_id in state.data.statuses_by_id.keys()  # type: ignore
+            for status_id in state.data.statuses_by_id.keys()
             if status_id != self.deleting_status_id
         ]
 
@@ -463,7 +434,7 @@ class StatusDeleteDialogState(rx.State):
                 )
             ]
 
-        state = await self.get_state(State)
+        state = await self.get_state(ProjectState)
         result = state.delete_status(
             self.deleting_status_id, self.migration_status_id
         )

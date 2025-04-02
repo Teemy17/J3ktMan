@@ -15,6 +15,7 @@ from J3ktMan.crud.tasks import (
     create_milestone,
     create_status,
     create_task,
+    delete_status,
     get_milestones_by_project_id,
     get_statuses_by_project_id,
     get_tasks_by_status_id,
@@ -321,3 +322,32 @@ class State(rx.State):
                     position="top-center",
                 )
             ]
+
+    @rx.event
+    def delete_status(
+        self, status_id: int, migration_status_id: int
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return None
+
+        # delete status
+        affecting_tasks = delete_status(status_id, migration_status_id)
+
+        # remove status from state
+        deleted_status_name = self.data.statuses_by_id[status_id].name
+        del self.data.statuses_by_id[status_id]
+
+        # remove tasks from state
+        for affecting_task in affecting_tasks:
+            self.data.tasks_by_id[affecting_task.id].model = affecting_task
+
+            self.data.statuses_by_id[migration_status_id].task_ids.append(
+                affecting_task.id
+            )
+
+        return [
+            rx.toast.success(
+                f"Status {deleted_status_name} has been deleted",
+                position="top-center",
+            )
+        ]
