@@ -5,7 +5,8 @@ from typing import List, Dict, Any
 from J3ktMan.component import timeline, base
 from typing_extensions import TypedDict
 from J3ktMan.utils import epoch_to_date
-from J3ktMan.component.task_diaglog import task_creation_dialog
+from J3ktMan.component.task_dialog import task_creation_dialog
+from J3ktMan.component.milestone_dialog import milestone_creation_dialog
 
 
 def get_milestone_data() -> pd.DataFrame:
@@ -553,6 +554,13 @@ def render_tasks():
                     milestone["tasks"],
                     lambda task: timeline.task_row(task),
                 ),
+            ),
+            # Create new milestone button in the last row
+            rx.box(
+                milestone_creation_dialog(),
+                width="100%",
+                height="40px",
+                padding_y="0.5rem",
             ),
             spacing="0",
             width="100%",

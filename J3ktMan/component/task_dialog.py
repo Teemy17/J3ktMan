@@ -3,6 +3,10 @@ from typing import Any, Dict
 from J3ktMan.utils import epoch_to_date
 
 
+class DateError(Exception):
+    pass
+
+
 class Task_Form_State(rx.State):
     """
     State for managing the task creation form.
@@ -28,6 +32,9 @@ class Task_Form_State(rx.State):
         """
         Handle form submission.
         """
+        if not self.check_date_validity():
+            raise DateError("Invalid date range.")
+
         self.form_data = form
         print("Form submitted:", form)
 
@@ -62,7 +69,7 @@ def task_creation_dialog() -> rx.Component:
         rx.dialog.content(
             rx.dialog.title("Create Task"),
             rx.flex(
-                rx.form(
+                rx.form.root(
                     rx.text(
                         "Task name",
                         as_="div",
