@@ -8,9 +8,10 @@ from typing_extensions import TypedDict
 
 import J3ktMan.model.project
 from J3ktMan.component import base, timeline
-from J3ktMan.component.milestone_dialog import milestone_creation_dialog
+from J3ktMan.component.create_milestone_dialog import create_milestone_dialog
 from J3ktMan.component.protected import protected_page_with
-from J3ktMan.component.create_task_dialog import task_creation_dialog
+from J3ktMan.component.task_dialog import task_dialog
+from J3ktMan.component.create_task_dialog import create_task_dialog
 from J3ktMan.crud.project import (
     InvalidProjectIDError,
     get_project,
@@ -186,7 +187,7 @@ def get_sprint_data() -> pd.DataFrame:
 
 
 class TaskDict(TypedDict):
-    id: str
+    id: int
     name: str
     start_date: str
     end_date: str
@@ -485,7 +486,7 @@ def render_month_headers():
 def render_task_name():
     """Render the milestone names and their tasks (when expanded)."""
 
-    def render_milestone_name(milestone):
+    def render_milestone_name(milestone: MilestoneDict) -> rx.Component:
         is_expanded = TimelineState.expanded_milestones[milestone["id"]]
         return rx.vstack(
             rx.hstack(
@@ -508,6 +509,8 @@ def render_task_name():
                     font_size="14px",
                     font_weight="bold",
                 ),
+                # a + button to create a new task under the milestone
+                create_task_dialog(),
                 spacing="2",
                 align_items="center",
                 width="100%",
@@ -520,24 +523,28 @@ def render_task_name():
                     milestone["tasks"],
                     lambda task: rx.box(
                         rx.hstack(
-                            rx.box(
-                                width="12px",
-                                height="12px",
-                                background_color=timeline.get_status_color(
-                                    str(task["status"])
+                            task_dialog(
+                                trigger=rx.hstack(
+                                    rx.box(
+                                        width="12px",
+                                        height="12px",
+                                        background_color=timeline.get_status_color(
+                                            str(task["status"])
+                                        ),
+                                        border_radius="2px",
+                                    ),
+                                    rx.text(
+                                        task["name"],
+                                        color="#eee",
+                                        font_size="14px",
+                                        font_weight="medium",
+                                    ),
+
                                 ),
-                                border_radius="2px",
-                            ),
-                            rx.text(
-                                task["name"],
-                                color="#eee",
-                                font_size="14px",
-                                font_weight="medium",
+                                task_id=task["id"],
                             ),
                             spacing="2",
                             align_items="center",
-                            # width="100%",
-                            # height="40px",
                         ),
                         padding_left="1.5rem",
                         height="40px",
@@ -584,8 +591,6 @@ def render_tasks():
                     height="100%",
                     width="100%",
                 ),
-                # a + button to create a new task under the milestone
-                task_creation_dialog(),
                 width="100%",
                 padding_y="0.5rem",
                 border_bottom=rx.cond(
@@ -599,13 +604,6 @@ def render_tasks():
                     milestone["tasks"],
                     lambda task: timeline.task_row(task),
                 ),
-            ),
-            # Create new milestone button in the last row
-            rx.box(
-                milestone_creation_dialog(),
-                width="100%",
-                height="40px",
-                padding_y="0.5rem",
             ),
             spacing="0",
             width="100%",
@@ -632,6 +630,13 @@ def timeline_view() -> rx.Component:
             rx.flex(
                 rx.box(
                     render_task_name(),
+                    # Create new milestone button in the last row
+                    create_milestone_dialog(
+                        trigger=rx.button(
+                            rx.icon(tag="plus"),
+                            rx.text("Create New Milestone"),
+                        )
+                    ),
                     width="200px",
                     align_items="flex-start",
                     height="auto",

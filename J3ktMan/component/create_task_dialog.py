@@ -32,8 +32,8 @@ class Task_Form_State(rx.State):
         """
         Handle form submission.
         """
-        if not self.check_date_validity():
-            raise DateError("Invalid date range.")
+        # if self.check_date_validity():
+        #     raise DateError("Invalid date range.")
 
         self.form_data = form
         print("Form submitted:", form)
@@ -55,26 +55,31 @@ class PriorityState(rx.State):
         self.value = value
 
 
-def task_creation_dialog() -> rx.Component:
+def create_task_dialog() -> rx.Component:
     """
     Dialog popup for creating a new task.
     """
 
     return rx.dialog.root(
         rx.dialog.trigger(
-            rx.button(
-                rx.icon(tag="plus"),
-            ),
+            rx.button(rx.icon(tag="plus", size=14), size="1"),
         ),
         rx.dialog.content(
-            rx.dialog.title("Create Task"),
-            rx.flex(
+            rx.vstack(
+                rx.hstack(
+                    rx.badge(
+                        rx.icon(tag="list-todo"),
+                        radius="full",
+                        padding="0.65rem",
+                    ),
+                    rx.dialog.title("Create Task"),
+                ),
                 rx.form.root(
                     rx.text(
                         "Task name",
                         as_="div",
                         size="2",
-                        margin_bottom="3px",
+                        margin_bottom="4px",
                         weight="bold",
                     ),
                     rx.input(
@@ -87,7 +92,7 @@ def task_creation_dialog() -> rx.Component:
                         "Description",
                         as_="div",
                         size="2",
-                        margin_bottom="3px",
+                        margin_bottom="4px",
                         weight="bold",
                     ),
                     rx.input(
@@ -99,7 +104,7 @@ def task_creation_dialog() -> rx.Component:
                         "Start Date",
                         as_="div",
                         size="2",
-                        margin_bottom="3px",
+                        margin_bottom="4px",
                         weight="bold",
                     ),
                     rx.input(
@@ -112,7 +117,7 @@ def task_creation_dialog() -> rx.Component:
                         "End Date",
                         as_="div",
                         size="2",
-                        margin_bottom="3px",
+                        margin_bottom="4px",
                         weight="bold",
                     ),
                     rx.input(
@@ -125,7 +130,7 @@ def task_creation_dialog() -> rx.Component:
                         "Select Priority",
                         as_="div",
                         size="2",
-                        margin_bottom="3px",
+                        margin_bottom="4px",
                         weight="bold",
                     ),
                     rx.select(
@@ -139,8 +144,7 @@ def task_creation_dialog() -> rx.Component:
                     ),
                     on_submit=Task_Form_State.submit,
                 ),
-                direction="column",
-                spacing="3",
+                spacing="4",
             ),
         ),
     )
