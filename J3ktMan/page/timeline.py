@@ -392,8 +392,8 @@ class TimelineState(rx.State):
 
             # starting from the current date - 24 months and forwards to the
             # current date + 24 months
-            starting = datetime(current_date.year - 2, current_date.month, 1)
-            ending = datetime(current_date.year + 2, current_date.month, 1)
+            starting = datetime(current_date.year, current_date.month, 1)
+            ending = datetime(current_date.year + 4, current_date.month, 1)
 
             months = []
             current = starting
