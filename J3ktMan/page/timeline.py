@@ -4,10 +4,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from J3ktMan.component import timeline, base
 from typing_extensions import TypedDict
-
-
-def epoch_to_date(epoch: int) -> str:
-    return datetime.fromtimestamp(epoch).strftime("%Y-%m-%d")
+from J3ktMan.utils import epoch_to_date
+from J3ktMan.component.task_diaglog import task_creation_dialog
 
 
 def get_milestone_data() -> pd.DataFrame:
@@ -413,6 +411,9 @@ class TimelineState(rx.State):
             not self.expanded_milestones.get(milestone_id, False)
         )
 
+    def show_task_creation_dialog(self):
+        """Show the task creation dialog."""
+
     @rx.var
     def total_width(self) -> int:
         """Compute the total width of the timeline in pixels based on the number of months."""
@@ -522,6 +523,7 @@ def render_tasks():
         return rx.vstack(
             rx.hstack(
                 rx.box(
+                    # timeline bar
                     rx.box(
                         position="absolute",
                         left=f"{milestone['start_position']}%",
@@ -536,6 +538,8 @@ def render_tasks():
                     height="100%",
                     width="100%",
                 ),
+                # a + button to create a new task under the milestone
+                task_creation_dialog(),
                 width="100%",
                 padding_y="0.5rem",
                 border_bottom=rx.cond(

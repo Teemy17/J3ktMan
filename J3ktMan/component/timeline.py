@@ -5,6 +5,7 @@ from typing import Dict, List, Any
 
 class TooltipState(rx.State):
     """State for the tooltip component."""
+
     visible: bool = False
     hovered_task_id: str = ""
 
@@ -40,11 +41,12 @@ def month_header(month: str, width: str) -> rx.Component:
         border_right="1px solid #4d4d4d",
     )
 
+
 def task_row(task: Dict[str, Any]) -> rx.Component:
     start_pos: float = task["start_position"]
     end_pos: float = task["end_position"]
     task_id: str = task["id"]
-    
+
     # Calculate the width of the task bar
     width_percent = rx.cond(
         end_pos >= start_pos,
@@ -56,7 +58,7 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
     # Positioning for start label
     start_label_left = rx.cond(
         start_pos < 5,  # If the start is near the left edge
-        "0%", 
+        "0%",
         f"{start_percent}%",
     )
     start_label_transform = rx.cond(
@@ -68,7 +70,7 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
     # Positioning for end label
     end_label_left = rx.cond(
         end_pos > 95,  # If the end is near the right edge
-        "100%", 
+        "100%",
         f"{end_pos}%",
     )
     end_label_transform = rx.cond(
@@ -127,9 +129,10 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
                     text_align=start_label_text_align,
                     white_space="nowrap",
                     display=rx.cond(
-                        (TooltipState.visible) & (TooltipState.hovered_task_id == task_id),
+                        (TooltipState.visible)
+                        & (TooltipState.hovered_task_id == task_id),
                         "block",
-                        "none"
+                        "none",
                     ),
                 ),
                 # End date label
@@ -150,13 +153,16 @@ def task_row(task: Dict[str, Any]) -> rx.Component:
                     text_align=end_label_text_align,
                     white_space="nowrap",
                     display=rx.cond(
-                        (TooltipState.visible) & (TooltipState.hovered_task_id == task_id),
+                        (TooltipState.visible)
+                        & (TooltipState.hovered_task_id == task_id),
                         "block",
-                        "none"
+                        "none",
                     ),
                 ),
-                on_mouse_over=lambda: TooltipState.show_tooltip(task_id),
-                on_mouse_out=TooltipState.hide_tooltip,
+                on_mouse_over=lambda: TooltipState.show_tooltip(
+                    task_id
+                ),  # type:ignore
+                on_mouse_out=TooltipState.hide_tooltip,  # type:ignore
                 position="absolute",
                 left=f"{start_percent}%",
                 height="20px",
