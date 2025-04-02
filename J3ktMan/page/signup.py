@@ -11,6 +11,7 @@ def signup() -> rx.Component:
                 clerk.sign_up(
                     path="/signup",
                     sign_in_url="/signin",
+                    fallback_redirect_url="/home",
                 ),
                 align="center",
                 spacing="7",
