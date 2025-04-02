@@ -12,15 +12,19 @@ from J3ktMan.crud.tasks import (
     ExistingStatusNameError,
     ExistingTaskNameError,
     MilestoneCreate,
+    assign_milestone,
     create_milestone,
     create_status,
     create_task,
     delete_status,
+    delete_task,
     get_milestones_by_project_id,
     get_statuses_by_project_id,
     get_tasks_by_status_id,
     rename_status,
+    rename_task,
     set_status,
+    set_task_description,
 )
 from J3ktMan.model.tasks import Priority
 
@@ -285,6 +289,7 @@ class State(rx.State):
 
         self.data.statuses_by_id[previous_status_id].task_ids.remove(task_id)
         self.data.statuses_by_id[status_id].task_ids.append(task_id)
+        self.data.tasks_by_id[task_id].status_id = status_id
 
     @rx.event
     def create_milestone(
@@ -348,6 +353,96 @@ class State(rx.State):
         return [
             rx.toast.success(
                 f"Status {deleted_status_name} has been deleted",
+                position="top-center",
+            )
+        ]
+
+    @rx.event
+    def assign_milestone(
+        self, task_id: int, milestone_id: int | None
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+
+        assign_milestone(milestone_id, task_id)
+
+        # update task in state
+        self.data.tasks_by_id[task_id].milestone_id = milestone_id
+        task_name = self.data.tasks_by_id[task_id].name
+
+        message = (
+            f'Task "{task_name}" has been assigned to "{self.data.milestones_by_id[milestone_id].name}"'  # type: ignore
+            if milestone_id is not None
+            else f'Task "{task_name}" has been unassigned'
+        )
+
+        return [
+            rx.toast.success(message, position="top-center"),
+        ]
+
+    @rx.event
+    def delete_task(self, task_id: int) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+
+        delete_task(task_id)
+
+        # delete task
+        deleted_task = self.data.tasks_by_id[task_id]
+        del self.data.tasks_by_id[task_id]
+
+        # remove task from status
+        self.data.statuses_by_id[deleted_task.status_id].task_ids.remove(
+            deleted_task.id
+        )
+
+        return [
+            rx.toast.success(
+                f'Task "{deleted_task.name}" has been deleted',
+                position="top-center",
+            )
+        ]
+
+    @rx.event
+    def rename_task(
+        self, task_id: int, new_name: str
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+
+        try:
+            new_task_model = rename_task(task_id, new_name)
+            self.data.tasks_by_id[task_id].name = new_task_model.name
+
+            return [
+                rx.toast.success(
+                    f'Task renamed to "{new_name}" successfully',
+                    position="top-center",
+                )
+            ]
+
+        except ExistingTaskNameError:
+            return [
+                rx.toast.error(
+                    f'Task with name"{new_name}" already exists',
+                    position="top-center",
+                )
+            ]
+
+    @rx.event
+    def set_task_description(
+        self, task_id: int, new_description: str
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+
+        set_task_description(task_id, new_description)
+        task = self.data.tasks_by_id[task_id]
+        task.description = new_description
+
+        return [
+            rx.toast.success(
+                f'Task "{task.name}" description has been updated',
                 position="top-center",
             )
         ]

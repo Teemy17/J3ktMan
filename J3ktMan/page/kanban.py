@@ -14,9 +14,6 @@ from J3ktMan.component.create_milestone_dialog import (
     create_milestone_dialog,
     State as CreateMilestoneState,
 )
-from J3ktMan.crud.tasks import (
-    delete_status,
-)
 from J3ktMan.model.project import Project
 from J3ktMan.component.base import base_page
 from J3ktMan.component.invite_member_dialog import invite_member_dialog
@@ -353,15 +350,7 @@ def task_card(task_id: int) -> rx.Component:
                 on_drag_start=State.on_drag(task_id),
                 on_drag_end=State.on_release,
             ),
-            ProjectState.data.tasks_by_id[task_id].name,  # type: ignore
-            ProjectState.data.tasks_by_id[task_id].description,  # type: ignore
-            ProjectState.data.tasks_by_id[task_id].milestone_id,  # type: ignore
-            ProjectState.milestone_name_by_ids,
             task_id,
-            on_task_name_edit=State.on_task_name_edit,  # type: ignore # type: ignore
-            on_task_description_edit=State.on_task_description_edit,
-            on_assign_milestone=State.assign_milestone,
-            on_delete_task=State.delete_task(task_id),
         ),
     )
 
