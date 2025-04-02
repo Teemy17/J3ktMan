@@ -775,7 +775,9 @@ def render_month_headers():
 def render_task_name():
     """Render the milestone names and their tasks (when expanded)."""
 
-    def render_milestone_name(milestone: MilestoneData) -> rx.Component:
+    def render_milestone_name(
+        milestone: MilestoneData, index: int
+    ) -> rx.Component:
         is_expanded = TimelineState.expanded_milestones[milestone.id]
         data: ProjectData = ProjectState.data  # type: ignore
 
@@ -789,7 +791,7 @@ def render_task_name():
                         "chevron-right",
                     ),
                     on_click=lambda: TimelineState.toggle_milestone(
-                        milestone["id"]  # type:ignore
+                        milestone.id  # type:ignore
                     ),
                     cursor="pointer",
                     margin_right="0.5rem",
@@ -799,6 +801,7 @@ def render_task_name():
                     color="#eee",
                     font_size="14px",
                     font_weight="bold",
+                    class_name="line-clamp-1 grow",
                 ),
                 # a + button to create a new task under the milestone
                 create_task_dialog(),
@@ -806,7 +809,6 @@ def render_task_name():
                 align_items="center",
                 width="100%",
                 height="40px",
-                min_height="40px",
             ),
             rx.cond(
                 is_expanded,
@@ -837,27 +839,34 @@ def render_task_name():
                                 ),
                                 task_id=task_id,
                             ),
-                            spacing="2",
-                            align_items="center",
+                            class_name="my-auto",
                         ),
                         padding_left="1.5rem",
                         height="40px",
+                        class_name=" flex",
                     ),
                 ),
             ),
             width="100%",
             spacing="0",
             align_items="stretch",
-            border_bottom="1px solid #4d4d4d",
+            class_name="border-r border-zinc-800 "
+            + rx.cond(  # type: ignore
+                index % 2 == 0,
+                "bg-zinc-900",
+                "",
+            ),
         )
 
     return rx.fragment(
         rx.box(
-            padding_y="18.5px"
+            background_color="#303030",
+            border_right="1px solid #4d4d4d",
+            height="40px",
         ),  # ensure the first task name aligns with the first timeline bar
         rx.foreach(
             ProjectState.milestones,
-            render_milestone_name,
+            lambda milestone, index: render_milestone_name(milestone, index),
         ),
     )
 
@@ -865,7 +874,9 @@ def render_task_name():
 def render_tasks():
     """Render the milestone rows with timeline bars (collapsed or expanded)."""
 
-    def render_milestone_row(milestone: MilestoneRender) -> rx.Component:
+    def render_milestone_row(
+        milestone: MilestoneRender, index: int
+    ) -> rx.Component:
         is_expanded = TimelineState.expanded_milestones[milestone.id]
         return rx.vstack(
             rx.hstack(
@@ -890,10 +901,7 @@ def render_tasks():
                 ),
                 width="100%",
                 padding_y="0.5rem",
-                border_bottom=rx.cond(
-                    is_expanded, "none", "1px solid #4d4d4d"
-                ),
-                height="41px",
+                height="40px",
             ),
             rx.cond(
                 is_expanded,
@@ -904,13 +912,20 @@ def render_tasks():
             ),
             spacing="0",
             width="100%",
+            class_name=rx.cond(
+                index % 2 == 0,
+                "bg-zinc-900",
+                "",
+            ),
         )
 
     return rx.fragment(
         rx.box(
             rx.foreach(
                 TimelineState.render_milestone,  # type: ignore
-                render_milestone_row,
+                lambda milestone, index: render_milestone_row(
+                    milestone, index
+                ),
             ),
             width="100%",
             min_width=f"{TimelineState.total_width_pixels}px",  # Ensure the tasks area matches the headers
@@ -962,7 +977,7 @@ def timeline_view() -> rx.Component:
                     direction="row",
                     width="100%",
                     spacing="0",
-                    height="auto",
+                    height="100%",
                 ),
                 width="100%",
                 spacing="5",
@@ -1004,13 +1019,17 @@ def get_status_color(status: str):
 def month_header(month: str, width: str) -> rx.Component:
     """Month header box."""
     return rx.box(
-        rx.text(month, font_size="14px", weight="bold"),
+        rx.text(
+            month,
+            font_size="14px",
+            class_name="my-auto mx-auto",
+            weight="bold",
+        ),
         width=width,
-        flex="0 0 auto",
-        text_align="center",
         background_color="#303030",
-        padding_y="0.5rem",
+        height="40px",
         border_right="1px solid #4d4d4d",
+        class_name="flex my-auto",
     )
 
 
@@ -1148,7 +1167,6 @@ def task_box(task: TaskRender, date_range: DateRange):
 
 
 def task_row(task: TaskRender) -> rx.Component:
-
     return rx.hstack(
         rx.box(
             rx.cond(
@@ -1161,7 +1179,6 @@ def task_row(task: TaskRender) -> rx.Component:
         ),
         width="100%",
         padding_y="0.5rem",
-        border_bottom="1px solid #4d4d4d",
         height="40px",
     )
 
@@ -1189,6 +1206,5 @@ def task_name(task: Dict[str, Any]) -> rx.Component:
         ),
         width="100%",
         padding="0.5rem",
-        border_bottom="1px solid #4d4d4d",
         height="40px",  # Fixed height to match timeline rows
     )
