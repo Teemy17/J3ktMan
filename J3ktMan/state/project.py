@@ -9,6 +9,7 @@ from J3ktMan.crud.project import (
     is_in_project,
 )
 from J3ktMan.crud.tasks import (
+    ExistingMilestoneNameError,
     ExistingStatusNameError,
     ExistingTaskNameError,
     MilestoneCreate,
@@ -320,7 +321,7 @@ class State(rx.State):
                 )
             ]
 
-        except ExistingStatusNameError:
+        except ExistingMilestoneNameError:
             return [
                 rx.toast.error(
                     f'Milestone "{name}" already exists',
