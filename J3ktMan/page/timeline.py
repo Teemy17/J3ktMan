@@ -602,7 +602,7 @@ def render_task_name():
                     class_name="line-clamp-1 grow",
                 ),
                 # a + button to create a new task under the milestone
-                create_task_dialog(),
+                create_task_dialog(milestone),
                 spacing="2",
                 align_items="center",
                 width="100%",
@@ -805,12 +805,6 @@ class TooltipState(rx.State):
 
 
 def get_status_color(status: str):
-    """Return color based on status."""
-    # if status == "DONE":
-    #     return "#4caf50"
-    # elif status == "IN PROGRESS":
-    #     return "#a881e6"
-    # else:
     return "#e0e0e0"
 
 

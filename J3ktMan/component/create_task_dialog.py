@@ -1,6 +1,8 @@
 import reflex as rx
-from typing import Any, Dict
-from J3ktMan.utils import epoch_to_date
+from typing import Any, Dict, List
+from J3ktMan.utils import epoch_to_date, date_to_epoch
+from J3ktMan.state.project import State as ProjectState
+from J3ktMan.model.tasks import Priority
 
 
 class DateError(Exception):
@@ -8,16 +10,6 @@ class DateError(Exception):
 
 
 class Task_Form_State(rx.State):
-    """
-    State for managing the task creation form.
-    """
-
-    name: str = ""
-    description: str = ""
-    priority: str = "LOW"
-    start_date: int = 0
-    end_date: int = 0
-    form_data: Dict[str, Any] = {}
 
     def check_date_validity(self) -> bool:
         """
@@ -32,17 +24,30 @@ class Task_Form_State(rx.State):
         """
         Handle form submission.
         """
-        # if self.check_date_validity():
-        #     raise DateError("Invalid date range.")
+        name: str = str(form["name"])
+        description: str = str(form["description"])
+        start_date: int = date_to_epoch(form["start_date"])
+        end_date: int = date_to_epoch(form["end_date"])
+        priority: Priority = Priority(str(form["priority"]))
+        milestone_id: int = int(form["milestone_id"])
 
-        self.form_data = form
-        print("Form submitted:", form)
+        # Get the selected status from TaskStatusState
+        task_status_state = await self.get_state(TaskStatusState)
+        status_id: int = task_status_state.statuses[form["status"]]
+
+        state = await self.get_state(ProjectState)
+        return state.create_task(
+            name,
+            description,
+            priority,
+            status_id,
+            milestone_id,
+            start_date,
+            end_date,
+        )
 
 
 class PriorityState(rx.State):
-    """
-    State for managing the priority selection.
-    """
 
     values: list[str] = ["LOW", "MEDIUM", "HIGH"]
     value: str = "LOW"
@@ -55,7 +60,26 @@ class PriorityState(rx.State):
         self.value = value
 
 
-def create_task_dialog() -> rx.Component:
+class TaskStatusState(rx.State):
+    statuses: Dict[str, int] = {}
+    value: str = "-"
+
+    @rx.var
+    async def values(self) -> List[str]:
+        state = await self.get_state(ProjectState)
+        for status in state.statuses:
+            self.statuses[status.name] = status.id
+        return [status.name for status in state.statuses]
+
+    @rx.event
+    def set_value(self, value: str) -> None:
+        """
+        Set the selected status value.
+        """
+        self.value = value
+
+
+def create_task_dialog(milestone) -> rx.Component:
     """
     Dialog popup for creating a new task.
     """
@@ -78,7 +102,7 @@ def create_task_dialog() -> rx.Component:
                         radius="full",
                         padding="0.65rem",
                     ),
-                    rx.dialog.title("Create Task"),
+                    rx.dialog.title(f"Create Task under {milestone.name}"),
                 ),
                 rx.form.root(
                     rx.text(
@@ -143,10 +167,31 @@ def create_task_dialog() -> rx.Component:
                         PriorityState.values,
                         value=PriorityState.value,
                         on_change=PriorityState.set_value,
+                        name="priority",
+                    ),
+                    rx.text(
+                        "Select Status",
+                        as_="div",
+                        size="2",
+                        margin_bottom="4px",
+                        weight="bold",
+                    ),
+                    rx.select(
+                        TaskStatusState.values,
+                        value=TaskStatusState.value,
+                        on_change=TaskStatusState.set_value,
+                        name="status",
+                    ),
+                    # Hidden input for milestone_id
+                    rx.input(
+                        name="milestone_id",
+                        value=milestone.id,  # Convert to string for input
+                        class_name="hidden",
                     ),
                     rx.button(
                         "Create Task",
                         color_scheme="blue",
+                        type="submit",
                     ),
                     on_submit=Task_Form_State.submit,
                 ),

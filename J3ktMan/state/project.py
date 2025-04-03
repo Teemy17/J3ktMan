@@ -13,6 +13,7 @@ from J3ktMan.crud.tasks import (
     ExistingStatusNameError,
     ExistingTaskNameError,
     MilestoneCreate,
+    DateError,
     assign_milestone,
     create_milestone,
     create_status,
@@ -227,7 +228,14 @@ class State(rx.State):
 
     @rx.event
     def create_task(
-        self, name: str, description: str, priority: Priority, status_id: int
+        self,
+        name: str,
+        description: str,
+        priority: Priority,
+        status_id: int,
+        milestone_id: int | None,
+        start_date: int | None = None,
+        end_date: int | None = None,
     ) -> list[EventSpec] | None:
 
         if self.data is None:
@@ -235,7 +243,15 @@ class State(rx.State):
 
         try:
             # create task
-            task = create_task(name, description, priority, status_id)
+            task = create_task(
+                name,
+                description,
+                priority,
+                status_id,
+                milestone_id,
+                start_date,
+                end_date,
+            )
 
             self.data.tasks_by_id[task.id] = Task(
                 id=task.id,
@@ -259,6 +275,14 @@ class State(rx.State):
             return [
                 rx.toast.error(
                     f'Task "{name}" already exists',
+                    position="top-center",
+                )
+            ]
+
+        except DateError:
+            return [
+                rx.toast.error(
+                    "Invalid date range",
                     position="top-center",
                 )
             ]
