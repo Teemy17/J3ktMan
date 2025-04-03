@@ -287,6 +287,37 @@ def create_task(
         return new_task
 
 
+def update_task_dates(
+    task_id: int,
+    start_date: int | None = None,
+    end_date: int | None = None,
+) -> Task:
+    """
+    Updates the start and end dates of a task.
+
+    Chechs:
+    - If the task exists
+    - If the start date is before the end date
+    """
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        if start_date is not None and end_date is not None:
+            if start_date > end_date:
+                raise DateError()
+
+        task.start_date = start_date
+        task.end_date = end_date
+
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        return task
+
+
 def get_task_by_id(task_id: int) -> Task | None:
     """
     Returns a task by its ID

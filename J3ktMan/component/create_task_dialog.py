@@ -1,6 +1,6 @@
 import reflex as rx
 from typing import Any, Dict, List
-from J3ktMan.utils import epoch_to_date, date_to_epoch
+from J3ktMan.utils import date_to_epoch
 from J3ktMan.state.project import State as ProjectState
 from J3ktMan.model.tasks import Priority
 
@@ -10,6 +10,7 @@ class DateError(Exception):
 
 
 class Task_Form_State(rx.State):
+    which_dialog_open: str = ""
 
     def check_date_validity(self) -> bool:
         """
@@ -36,7 +37,7 @@ class Task_Form_State(rx.State):
         status_id: int = task_status_state.statuses[form["status"]]
 
         state = await self.get_state(ProjectState)
-        return state.create_task(
+        created_task = state.create_task(
             name,
             description,
             priority,
@@ -45,6 +46,15 @@ class Task_Form_State(rx.State):
             start_date,
             end_date,
         )
+
+        return created_task
+
+    @rx.event
+    def set_which_dialog_open(self, value: str) -> None:
+        """
+        Set the dialog open state.
+        """
+        self.which_dialog_open = value
 
 
 class PriorityState(rx.State):
@@ -84,118 +94,130 @@ def create_task_dialog(milestone) -> rx.Component:
     Dialog popup for creating a new task.
     """
 
-    return rx.dialog.root(
-        rx.dialog.trigger(
-            rx.button(
-                rx.icon(tag="plus", size=14),
-                size="1",
-                variant="ghost",
-                color_scheme="gray",
-                class_name="mx-1",
-            ),
-        ),
-        rx.dialog.content(
-            rx.vstack(
-                rx.hstack(
-                    rx.badge(
-                        rx.icon(tag="list-todo"),
-                        radius="full",
-                        padding="0.65rem",
-                    ),
-                    rx.dialog.title(f"Create Task under {milestone.name}"),
+    return (
+        rx.dialog.root(
+            rx.dialog.trigger(
+                rx.button(
+                    rx.icon(tag="plus", size=14),
+                    size="1",
+                    variant="ghost",
+                    color_scheme="gray",
+                    class_name="mx-1",
                 ),
-                rx.form.root(
-                    rx.text(
-                        "Task name",
-                        as_="div",
-                        size="2",
-                        margin_bottom="4px",
-                        weight="bold",
-                    ),
-                    rx.input(
-                        name="name",
-                        placeholder="Enter task name",
-                        required=True,
-                        type="text",
-                    ),
-                    rx.text(
-                        "Description",
-                        as_="div",
-                        size="2",
-                        margin_bottom="4px",
-                        weight="bold",
-                    ),
-                    rx.input(
-                        name="description",
-                        placeholder="Enter description",
-                        type="text",
-                    ),
-                    rx.text(
-                        "Start Date",
-                        as_="div",
-                        size="2",
-                        margin_bottom="4px",
-                        weight="bold",
-                    ),
-                    rx.input(
-                        name="start_date",
-                        placeholder="Enter start date",
-                        required=True,
-                        type="date",
-                    ),
-                    rx.text(
-                        "End Date",
-                        as_="div",
-                        size="2",
-                        margin_bottom="4px",
-                        weight="bold",
-                    ),
-                    rx.input(
-                        name="end_date",
-                        placeholder="Enter end date",
-                        required=True,
-                        type="date",
-                    ),
-                    rx.text(
-                        "Select Priority",
-                        as_="div",
-                        size="2",
-                        margin_bottom="4px",
-                        weight="bold",
-                    ),
-                    rx.select(
-                        PriorityState.values,
-                        value=PriorityState.value,
-                        on_change=PriorityState.set_value,
-                        name="priority",
-                    ),
-                    rx.text(
-                        "Select Status",
-                        as_="div",
-                        size="2",
-                        margin_bottom="4px",
-                        weight="bold",
-                    ),
-                    rx.select(
-                        TaskStatusState.values,
-                        value=TaskStatusState.value,
-                        on_change=TaskStatusState.set_value,
-                        name="status",
-                    ),
-                    # Hidden input for milestone_id
-                    rx.input(
-                        name="milestone_id",
-                        value=milestone.id,  # Convert to string for input
-                        class_name="hidden",
-                    ),
-                    rx.button(
-                        "Create Task",
-                        color_scheme="blue",
-                        type="submit",
-                    ),
-                    on_submit=Task_Form_State.submit,
-                ),
-                spacing="4",
             ),
+            rx.dialog.content(
+                rx.vstack(
+                    rx.hstack(
+                        rx.badge(
+                            rx.icon(tag="list-todo"),
+                            radius="full",
+                            padding="0.65rem",
+                        ),
+                        rx.vstack(
+                            rx.dialog.title(f"Create Task"),
+                            rx.dialog.description(
+                                f'Create new Task under milestone "{milestone.name}"'
+                            ),
+                            spacing="1",
+                        ),
+                    ),
+                    rx.form.root(
+                        rx.text(
+                            "Task name",
+                            as_="div",
+                            size="2",
+                            margin_bottom="4px",
+                            weight="bold",
+                        ),
+                        rx.input(
+                            name="name",
+                            placeholder="Enter task name",
+                            required=True,
+                            type="text",
+                        ),
+                        rx.text(
+                            "Description",
+                            as_="div",
+                            size="2",
+                            margin_bottom="4px",
+                            weight="bold",
+                        ),
+                        rx.input(
+                            name="description",
+                            placeholder="Enter description",
+                            type="text",
+                        ),
+                        rx.text(
+                            "Start Date",
+                            as_="div",
+                            size="2",
+                            margin_bottom="4px",
+                            weight="bold",
+                        ),
+                        rx.input(
+                            name="start_date",
+                            placeholder="Enter start date",
+                            required=True,
+                            type="date",
+                        ),
+                        rx.text(
+                            "End Date",
+                            as_="div",
+                            size="2",
+                            margin_bottom="4px",
+                            weight="bold",
+                        ),
+                        rx.input(
+                            name="end_date",
+                            placeholder="Enter end date",
+                            required=True,
+                            type="date",
+                        ),
+                        rx.text(
+                            "Select Priority",
+                            as_="div",
+                            size="2",
+                            margin_bottom="4px",
+                            weight="bold",
+                        ),
+                        rx.select(
+                            PriorityState.values,
+                            value=PriorityState.value,
+                            on_change=PriorityState.set_value,
+                            name="priority",
+                        ),
+                        rx.text(
+                            "Select Status",
+                            as_="div",
+                            size="2",
+                            margin_bottom="4px",
+                            weight="bold",
+                        ),
+                        rx.select(
+                            TaskStatusState.values,
+                            value=TaskStatusState.value,
+                            on_change=TaskStatusState.set_value,
+                            name="status",
+                        ),
+                        # Hidden input for milestone_id
+                        rx.input(
+                            name="milestone_id",
+                            value=milestone.id,  # Convert to string for input
+                            class_name="hidden",
+                        ),
+                        rx.spacer(direction="column", spacing="3"),
+                        rx.button(
+                            "Create Task",
+                            color_scheme="blue",
+                            type="submit",
+                        ),
+                        on_submit=Task_Form_State.submit,
+                    ),
+                    spacing="4",
+                ),
+            ),
+            on_open_change=Task_Form_State.set_which_dialog_open(
+                ""
+            ),  # type:ignore
         ),
     )

@@ -27,6 +27,7 @@ from J3ktMan.crud.tasks import (
     rename_task,
     set_status,
     set_task_description,
+    update_task_dates,
 )
 from J3ktMan.model.tasks import Priority
 
@@ -65,7 +66,7 @@ class Data(rx.Base):
 
 class State(rx.State):
     """
-    This state fetches all the data needed to display the project page. It waas
+    This state fetches all the data needed to display the project page. It was
     meant to be used in pages that uses the project information.
     """
 
@@ -195,6 +196,17 @@ class State(rx.State):
             return []
 
         return list(self.data.statuses_by_id.values())
+
+    @rx.var(cache=True)
+    def tasks(self) -> dict[int, Task]:
+        """
+        Returns the dict of tasks.
+        """
+
+        if self.data is None:
+            return {}
+
+        return self.data.tasks_by_id
 
     @rx.event
     def create_status(self, status_name: str) -> list[EventSpec] | None:
@@ -495,3 +507,67 @@ class State(rx.State):
                 position="top-center",
             )
         ]
+
+    @rx.event
+    def change_task_dates(
+        self,
+        task_id: int,
+        start_date: int | None = None,
+        end_date: int | None = None,
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+        try:
+            update_task_dates(task_id, start_date, end_date)
+            task = self.data.tasks_by_id[task_id]
+            task.start_date = start_date
+            task.end_date = end_date
+
+            return [
+                rx.toast.success(
+                    f'Task "{task.name}" dates have been updated',
+                    position="top-center",
+                )
+            ]
+        except DateError:
+            return [
+                rx.toast.error(
+                    "Invalid date range",
+                    position="top-center",
+                )
+            ]
+
+    @rx.event
+    def edit_task(
+        self,
+        task_id: int,
+        name: str,
+        description: str,
+        start_date: int | None = None,
+        end_date: int | None = None,
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+
+        try:
+            task = rename_task(task_id, name)
+            task.description = description
+            update_task_dates(task_id, start_date, end_date)
+            self.data.tasks_by_id[task_id].name = task.name
+            self.data.tasks_by_id[task_id].description = task.description
+            self.data.tasks_by_id[task_id].start_date = start_date
+            self.data.tasks_by_id[task_id].end_date = end_date
+
+            return [
+                rx.toast.success(
+                    f'Task "{name}" has been updated',
+                    position="top-center",
+                )
+            ]
+        except ExistingTaskNameError:
+            return [
+                rx.toast.error(
+                    f'Task with name"{name}" already exists',
+                    position="top-center",
+                )
+            ]

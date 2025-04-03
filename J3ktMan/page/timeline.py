@@ -16,6 +16,7 @@ from J3ktMan.state.project import (
     Data as ProjectData,
     Milestone as MilestoneData,
 )
+from J3ktMan.component.task_elipsis import task_elipsis
 from J3ktMan.utils import epoch_to_date
 import calendar
 
@@ -319,14 +320,35 @@ class TimelineState(rx.State):
         }
 
     @rx.event
+    async def on_update(self):
+        project_state = await self.get_state(ProjectState)
+
+        if project_state.data is None:
+            return
+
+        self.current_project = project_state.data  # type: ignore
+        self.milestone_data = get_milestone_data(project_state.data)
+        self.sprint_data = get_sprint_data(project_state.data)
+
+        self.set(
+            milestones=[
+                {
+                    "id": milestone.id,
+                    "name": milestone.name,
+                    "description": milestone.description,
+                    "due_date": epoch_to_date(milestone.due_date),  # type: ignore
+                    "tasks": [],
+                }
+                for milestone in project_state.milestones
+            ]
+        )
+
+    @rx.event
     def toggle_milestone(self, milestone_id: int):
         """Toggle the expanded state of a milestone."""
         self.expanded_milestones[milestone_id] = (
             not self.expanded_milestones.get(milestone_id, False)
         )
-
-    def show_task_creation_dialog(self):
-        """Show the task creation dialog."""
 
     @rx.var
     def total_width(self) -> int:
@@ -634,6 +656,11 @@ def render_task_name():
                                         font_size="14px",
                                         font_weight="medium",
                                     ),
+                                    # a ... button to edit & delete the task
+                                    rx.spacer(spacing="4"),
+                                    task_elipsis(data.tasks_by_id[task_id]),
+                                    width="100%",
+                                    align_items="center",
                                 ),
                                 task_id=task_id,
                             ),
@@ -655,6 +682,8 @@ def render_task_name():
                 "",
             ),
         )
+
+        print(data.tasks_by_id[task_id])
 
     return rx.fragment(
         rx.box(
