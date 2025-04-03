@@ -62,7 +62,13 @@ def create_task_dialog() -> rx.Component:
 
     return rx.dialog.root(
         rx.dialog.trigger(
-            rx.button(rx.icon(tag="plus", size=14), size="1"),
+            rx.button(
+                rx.icon(tag="plus", size=14),
+                size="1",
+                variant="ghost",
+                color_scheme="gray",
+                class_name="mx-1",
+            ),
         ),
         rx.dialog.content(
             rx.vstack(

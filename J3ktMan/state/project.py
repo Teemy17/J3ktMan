@@ -9,6 +9,7 @@ from J3ktMan.crud.project import (
     is_in_project,
 )
 from J3ktMan.crud.tasks import (
+    ExistingMilestoneNameError,
     ExistingStatusNameError,
     ExistingTaskNameError,
     MilestoneCreate,
@@ -35,6 +36,8 @@ class Task(rx.Base):
     description: str
     status_id: int
     milestone_id: int | None
+    start_date: int | None
+    end_date: int | None
 
 
 class Status(rx.Base):
@@ -48,6 +51,7 @@ class Milestone(rx.Base):
     id: int
     name: str
     description: str
+    task_ids: list[int]
 
 
 class Data(rx.Base):
@@ -93,6 +97,15 @@ class State(rx.State):
                     ),
                 ]
 
+            milestones = get_milestones_by_project_id(project_id)
+            for milestone in milestones:
+                milestones_by_id[milestone.id] = Milestone(
+                    id=milestone.id,
+                    name=milestone.name,
+                    description=milestone.description,
+                    task_ids=[],
+                )
+
             statuses = get_statuses_by_project_id(project_id)
             for status in statuses:
                 statuses_by_id[status.id] = Status(
@@ -105,24 +118,22 @@ class State(rx.State):
                 tasks = get_tasks_by_status_id(status.id)
 
                 for task in tasks:
-
                     tasks_by_id[task.id] = Task(
                         id=task.id,
                         name=task.name,
                         description=task.description,
                         status_id=task.status_id,
                         milestone_id=task.milestone_id,
+                        start_date=task.start_date,
+                        end_date=task.end_date,
                     )
 
                     statuses_by_id[status.id].task_ids.append(task.id)
 
-            milestones = get_milestones_by_project_id(project_id)
-            for milestone in milestones:
-                milestones_by_id[milestone.id] = Milestone(
-                    id=milestone.id,
-                    name=milestone.name,
-                    description=milestone.description,
-                )
+                    if task.milestone_id is not None:
+                        milestones_by_id[task.milestone_id].task_ids.append(
+                            task.id
+                        )
 
             new_page_data = Data(
                 project_id=project_id,
@@ -232,6 +243,8 @@ class State(rx.State):
                 description=task.description,
                 status_id=task.status_id,
                 milestone_id=None,
+                start_date=task.start_date,
+                end_date=task.end_date,
             )
             self.data.statuses_by_id[status_id].task_ids.append(task.id)
 
@@ -311,6 +324,7 @@ class State(rx.State):
                 id=milestone.id,
                 name=milestone.name,
                 description=milestone.description,
+                task_ids=[],
             )
 
             return [
@@ -320,7 +334,7 @@ class State(rx.State):
                 )
             ]
 
-        except ExistingStatusNameError:
+        except ExistingMilestoneNameError:
             return [
                 rx.toast.error(
                     f'Milestone "{name}" already exists',
@@ -364,10 +378,21 @@ class State(rx.State):
         if self.data is None:
             return
 
+        old_milestone_id = self.data.tasks_by_id[task_id].milestone_id
         assign_milestone(milestone_id, task_id)
 
         # update task in state
+
+        if old_milestone_id is not None:
+            self.data.milestones_by_id[old_milestone_id].task_ids.remove(
+                task_id
+            )
+
         self.data.tasks_by_id[task_id].milestone_id = milestone_id
+
+        if milestone_id is not None:
+            self.data.milestones_by_id[milestone_id].task_ids.append(task_id)
+
         task_name = self.data.tasks_by_id[task_id].name
 
         message = (
