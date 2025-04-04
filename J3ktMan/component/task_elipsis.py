@@ -53,7 +53,13 @@ class TaskEditState(rx.State):
         """
         state = await self.get_state(ProjectState)
         await state.load_project()
-        task = state.tasks.get(task_id)
+        print(task_id)
+        task = state.tasks()[task_id]
+        print(state.tasks())
+        print(
+            f"Task: {task.id}, {task.name}, {task.description}, {task.start_date}, {task.end_date}"
+        )
+
         if task:
             self.task_id = task.id
             self.name = task.name
@@ -90,6 +96,8 @@ def delete_dialog(task_id: int) -> rx.Component:
 
 
 def edit_dialog(task_id: int) -> rx.Component:
+    print(f"Edit dialog task_id: {task_id}")
+
     return rx.alert_dialog.root(
         rx.alert_dialog.content(
             rx.hstack(
@@ -146,14 +154,16 @@ def edit_dialog(task_id: int) -> rx.Component:
                         class_name="hidden",
                         value=TaskEditState.task_id,
                     ),
-                    rx.button(
-                        "Edit",
-                        type="submit",
-                        margin_top="1rem",
-                        color_scheme="blue",
-                        class_name="w-full",
-                        padding="1rem",
-                        border_radius="0.5rem",
+                    rx.alert_dialog.action(
+                        rx.button(
+                            "Edit",
+                            type="submit",
+                            margin_top="1rem",
+                            color_scheme="blue",
+                            class_name="w-full",
+                            padding="1rem",
+                            border_radius="0.5rem",
+                        ),
                     ),
                     direction="column",
                     spacing="1",
@@ -174,7 +184,7 @@ def edit_dialog(task_id: int) -> rx.Component:
     )
 
 
-def task_elipsis(task: Task) -> rx.Component:
+def task_elipsis(task_id: int) -> rx.Component:
     """
     Ellipsis button -> dropdown widget for each task.
     """
@@ -204,7 +214,7 @@ def task_elipsis(task: Task) -> rx.Component:
                 ),
             ),
         ),
-        delete_dialog(task.id),
-        edit_dialog(task.id),
+        delete_dialog(task_id),
+        edit_dialog(task_id),
         align="center",
     )

@@ -197,7 +197,6 @@ class State(rx.State):
 
         return list(self.data.statuses_by_id.values())
 
-    @rx.var(cache=True)
     def tasks(self) -> dict[int, Task]:
         """
         Returns the dict of tasks.

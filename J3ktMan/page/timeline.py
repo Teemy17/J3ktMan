@@ -637,30 +637,29 @@ def render_task_name():
                     lambda task_id: rx.box(
                         rx.hstack(
                             task_dialog(
-                                trigger=rx.hstack(
-                                    rx.box(
-                                        width="12px",
-                                        height="12px",
-                                        background_color=get_status_color(
-                                            data.statuses_by_id[
-                                                data.tasks_by_id[
-                                                    task_id
-                                                ].status_id
-                                            ].name
+                                trigger=rx.box(
+                                    rx.hstack(
+                                        rx.box(
+                                            width="12px",
+                                            height="12px",
+                                            background_color=get_status_color(
+                                                data.statuses_by_id[
+                                                    data.tasks_by_id[
+                                                        task_id
+                                                    ].status_id
+                                                ].name
+                                            ),
+                                            border_radius="2px",
                                         ),
-                                        border_radius="2px",
+                                        rx.text(
+                                            data.tasks_by_id[task_id].name,
+                                            color="#eee",
+                                            font_size="14px",
+                                            font_weight="medium",
+                                        ),
+                                        width="100%",
+                                        align_items="center",
                                     ),
-                                    rx.text(
-                                        data.tasks_by_id[task_id].name,
-                                        color="#eee",
-                                        font_size="14px",
-                                        font_weight="medium",
-                                    ),
-                                    # a ... button to edit & delete the task
-                                    rx.spacer(spacing="4"),
-                                    task_elipsis(data.tasks_by_id[task_id]),
-                                    width="100%",
-                                    align_items="center",
                                 ),
                                 task_id=task_id,
                             ),

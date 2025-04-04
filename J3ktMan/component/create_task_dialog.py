@@ -95,8 +95,8 @@ def create_task_dialog(milestone) -> rx.Component:
     """
 
     return (
-        rx.dialog.root(
-            rx.dialog.trigger(
+        rx.alert_dialog.root(
+            rx.alert_dialog.trigger(
                 rx.button(
                     rx.icon(tag="plus", size=14),
                     size="1",
@@ -105,7 +105,7 @@ def create_task_dialog(milestone) -> rx.Component:
                     class_name="mx-1",
                 ),
             ),
-            rx.dialog.content(
+            rx.alert_dialog.content(
                 rx.vstack(
                     rx.hstack(
                         rx.badge(
@@ -114,8 +114,8 @@ def create_task_dialog(milestone) -> rx.Component:
                             padding="0.65rem",
                         ),
                         rx.vstack(
-                            rx.dialog.title(f"Create Task"),
-                            rx.dialog.description(
+                            rx.alert_dialog.title(f"Create Task"),
+                            rx.alert_dialog.description(
                                 f'Create new Task under milestone "{milestone.name}"'
                             ),
                             spacing="1",
@@ -206,10 +206,15 @@ def create_task_dialog(milestone) -> rx.Component:
                             class_name="hidden",
                         ),
                         rx.spacer(direction="column", spacing="3"),
-                        rx.button(
-                            "Create Task",
-                            color_scheme="blue",
-                            type="submit",
+                        rx.alert_dialog.action(
+                            rx.button(
+                                "Create Task",
+                                color_scheme="blue",
+                                type="submit",
+                                margin_top="2rem",
+                                class_name="w-full",
+                                padding="1rem",
+                            ),
                         ),
                         on_submit=Task_Form_State.submit,
                     ),
