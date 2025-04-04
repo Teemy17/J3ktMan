@@ -885,7 +885,7 @@ def task_dialog(
             on_assign_milestone=on_assign_milestone,
             on_task_delete=on_delete_task,
         ),
-        rx.dialog.trigger(trigger),
+        trigger,
         open=State.editing_task_id == task_id,
         on_open_change=lambda e: State.set_editing_task_id(task_id, e),
     )
