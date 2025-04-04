@@ -1,6 +1,6 @@
 import reflex as rx
 from typing import List, Dict, Any
-from J3ktMan.model.project import Project
+
 from J3ktMan.crud.project import get_projects
 from reflex_clerk import ClerkState
 import datetime
