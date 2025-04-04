@@ -9,14 +9,13 @@ import J3ktMan.model.project
 from J3ktMan.component import base
 from J3ktMan.component.create_milestone_dialog import create_milestone_dialog
 from J3ktMan.component.protected import protected_page_with
-from J3ktMan.component.task_dialog import task_dialog
+from J3ktMan.component.task_dialog import task_dialog 
 from J3ktMan.component.create_task_dialog import create_task_dialog
 from J3ktMan.state.project import (
     State as ProjectState,
     Data as ProjectData,
     Milestone as MilestoneData,
 )
-from J3ktMan.component.task_elipsis import task_elipsis
 from J3ktMan.utils import epoch_to_date
 import calendar
 
@@ -638,7 +637,7 @@ def render_task_name():
                         rx.hstack(
                             task_dialog(
                                 trigger=rx.dialog.trigger(
-                                    rx.box(
+                                    rx.button(
                                         rx.hstack(
                                             rx.box(
                                                 width="12px",
@@ -661,15 +660,19 @@ def render_task_name():
                                             width="100%",
                                             align_items="center",
                                         ),
+                                        variant="ghost",
+                                        color_scheme="gray",
+                                        width="95%",
                                     )
                                 ),
                                 task_id=task_id,
                             ),
                             class_name="my-auto",
+                            width="100%",
                         ),
                         padding_left="1.5rem",
                         height="40px",
-                        class_name=" flex",
+                        class_name="flex",
                     ),
                 ),
             ),
@@ -683,7 +686,6 @@ def render_task_name():
                 "",
             ),
         )
-
 
     return rx.fragment(
         rx.box(
