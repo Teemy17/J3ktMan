@@ -1,6 +1,5 @@
 import reflex as rx
 import reflex_clerk as clerk
-from reflex_clerk.lib.appearance import Appearance
 
 
 def logo() -> rx.Component:

@@ -5,6 +5,7 @@ import reflex as rx
 from J3ktMan.page.index import index
 from J3ktMan.page.join_project import join_project
 from J3ktMan.page.kanban import kanban
+from J3ktMan.page.members import member_page
 from J3ktMan.page.signup import signup
 from J3ktMan.page.signin import signin
 from J3ktMan.page.timeline import timeline_view
@@ -25,6 +26,7 @@ app.add_page(signin, route="signin/[[...slug]]")
 app.add_page(signup, route="signup/[[...slug]]")
 app.add_page(home)
 app.add_page(dashboard)
+app.add_page(member_page)
 
 app.add_page(join_project)
 app.add_page(timeline_view)
