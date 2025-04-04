@@ -644,24 +644,24 @@ def render_task_name():
                                 trigger=rx.dialog.trigger(
                                     rx.button(
                                         rx.hstack(
-                                            rx.box(
-                                                width="12px",
-                                                height="12px",
-                                                background_color=get_status_color(
+                                            rx.icon(
+                                                tag="brackets",
+                                                size=12,
+                                                color=get_status_color(
                                                     data.statuses_by_id[
                                                         data.tasks_by_id[
                                                             task_id
                                                         ].status_id
                                                     ].name
                                                 ),
-                                                border_radius="2px",
+                                                class_name="my-auto",
                                             ),
                                             rx.text(
                                                 data.tasks_by_id[task_id].name,
                                                 color="#eee",
                                                 font_size="14px",
                                                 font_weight="medium",
-                                                class_name="line-clamp-1",
+                                                class_name="my-auto line-clamp-1",
                                             ),
                                             width="100%",
                                             align_items="center",

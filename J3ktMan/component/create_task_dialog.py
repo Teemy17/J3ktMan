@@ -114,7 +114,7 @@ def create_task_dialog(milestone) -> rx.Component:
                             padding="0.65rem",
                         ),
                         rx.vstack(
-                            rx.alert_dialog.title(f"Create Task"),
+                            rx.alert_dialog.title("Create Task"),
                             rx.alert_dialog.description(
                                 f'Create new Task under milestone "{milestone.name}"'
                             ),
