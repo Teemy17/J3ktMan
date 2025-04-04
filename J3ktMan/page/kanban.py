@@ -165,6 +165,9 @@ class State(rx.State):
             "",
             Priority.MEDIUM,
             status_id,
+            None,
+            None,
+            None
         )
 
         return result

@@ -16,7 +16,6 @@ from J3ktMan.state.project import (
     Data as ProjectData,
     Milestone as MilestoneData,
 )
-from J3ktMan.component.task_elipsis import task_elipsis
 from J3ktMan.utils import epoch_to_date
 import calendar
 
@@ -603,22 +602,27 @@ def render_task_name():
 
         return rx.vstack(
             rx.hstack(
-                rx.icon(
+                rx.button(
                     # tag="chevron-right" if not is_expanded else "chevron-down",
-                    tag=rx.cond(
-                        is_expanded,
-                        "chevron-down",
-                        "chevron-right",
+                    rx.icon(
+                        rx.cond(
+                            is_expanded,
+                            "chevron-down",
+                            "chevron-right",
+                        ),
+                        size=1,
                     ),
                     on_click=lambda: TimelineState.toggle_milestone(
                         milestone.id  # type:ignore
                     ),
                     cursor="pointer",
                     margin_right="0.5rem",
+                    variant="ghost",
+                    color_scheme="gray",
+                    class_name="p-0 ml-1",
                 ),
                 rx.text(
                     milestone.name,
-                    color="#eee",
                     font_size="14px",
                     font_weight="bold",
                     class_name="line-clamp-1 grow",
@@ -637,58 +641,64 @@ def render_task_name():
                     lambda task_id: rx.box(
                         rx.hstack(
                             task_dialog(
-                                trigger=rx.box(
-                                    rx.hstack(
-                                        rx.box(
-                                            width="12px",
-                                            height="12px",
-                                            background_color=get_status_color(
-                                                data.statuses_by_id[
-                                                    data.tasks_by_id[
-                                                        task_id
-                                                    ].status_id
-                                                ].name
+                                trigger=rx.dialog.trigger(
+                                    rx.button(
+                                        rx.hstack(
+                                            rx.icon(
+                                                tag="brackets",
+                                                size=12,
+                                                class_name="my-auto",
                                             ),
-                                            border_radius="2px",
+                                            rx.text(
+                                                data.tasks_by_id[task_id].name,
+                                                font_size="14px",
+                                                font_weight="medium",
+                                                class_name="my-auto line-clamp-1 ",
+                                            ),
+                                            class_name="flex",
+                                            width="100%",
                                         ),
-                                        rx.text(
-                                            data.tasks_by_id[task_id].name,
-                                            color="#eee",
-                                            font_size="14px",
-                                            font_weight="medium",
-                                        ),
-                                        width="100%",
-                                        align_items="center",
-                                    ),
+                                        variant="ghost",
+                                        color_scheme="gray",
+                                        width="95%",
+                                    )
                                 ),
                                 task_id=task_id,
                             ),
                             class_name="my-auto",
+                            width="100%",
                         ),
-                        padding_left="1.5rem",
+                        padding_left="2rem",
                         height="40px",
-                        class_name=" flex",
+                        class_name="flex",
                     ),
                 ),
             ),
             width="100%",
             spacing="0",
             align_items="stretch",
-            class_name="border-r border-zinc-800 "
+            class_name="border-r "
+            + rx.color_mode_cond(  # type: ignore
+                light="border-zinc-200 ",
+                dark="border-zinc-800 ",
+            )
             + rx.cond(  # type: ignore
                 index % 2 == 0,
-                "bg-zinc-900",
+                rx.color_mode_cond(
+                    light="bg-zinc-100",
+                    dark="bg-zinc-900",
+                ),
                 "",
             ),
         )
 
-        print(data.tasks_by_id[task_id])
-
     return rx.fragment(
         rx.box(
-            background_color="#303030",
-            border_right="1px solid #4d4d4d",
             height="40px",
+            class_name=rx.color_mode_cond(
+                light="bg-zinc-200 border-r border-zinc-300",
+                dark="bg-zinc-800 border-r border-zinc-700",
+            ),
         ),  # ensure the first task name aligns with the first timeline bar
         rx.foreach(
             ProjectState.milestones,
@@ -714,16 +724,19 @@ def render_tasks():
                             position="absolute",
                             left=f"{milestone.date_range.left}%",  # type: ignore
                             width=f"{milestone.date_range.width}%",  # type: ignore
-                            height="20px",
-                            background_color="#5b279c",
+                            height="100%",
                             border_radius="3px",
-                            border="1px solid white",
-                            padding_y="0.5rem",
+                            class_name="my-auto bg-gradient-to-r shadow-lg "  # type:ignore
+                            + rx.color_mode_cond(
+                                light="from-indigo-500 to-purple-400",
+                                dark="from-indigo-400 to-purple-700",
+                            ),
                         ),
                     ),
                     position="relative",
                     height="100%",
                     width=f"{TimelineState.total_width_pixels}px",
+                    class_name="my-auto flex",
                 ),
                 width="100%",
                 padding_y="0.5rem",
@@ -740,7 +753,10 @@ def render_tasks():
             width="100%",
             class_name=rx.cond(
                 index % 2 == 0,
-                "bg-zinc-900",
+                rx.color_mode_cond(
+                    light="bg-zinc-100",
+                    dark="bg-zinc-900",
+                ),
                 "",
             ),
         )
@@ -776,8 +792,17 @@ def timeline_view() -> rx.Component:
                         # Create new milestone button in the last row
                         create_milestone_dialog(
                             trigger=rx.button(
-                                rx.icon(tag="plus"),
-                                rx.text("Create New Milestone"),
+                                rx.hstack(
+                                    rx.icon(tag="plus", class_name="my-auto"),
+                                    rx.text(
+                                        "Create New Milestone",
+                                        class_name="my-auto",
+                                    ),
+                                    class_name="flex",
+                                ),
+                                width="100%",
+                                variant="soft",
+                                color_scheme="indigo",
                             )
                         ),
                         width="400px",
@@ -832,10 +857,6 @@ class TooltipState(rx.State):
         self.hovered_task_id = None
 
 
-def get_status_color(status: str):
-    return "#e0e0e0"
-
-
 def month_header(month: str, width: str) -> rx.Component:
     """Month header box."""
     return rx.box(
@@ -846,10 +867,12 @@ def month_header(month: str, width: str) -> rx.Component:
             weight="bold",
         ),
         width=width,
-        background_color="#303030",
         height="40px",
-        border_right="1px solid #4d4d4d",
-        class_name="flex my-auto",
+        class_name="flex my-auto " # type: ignore
+        + rx.color_mode_cond(
+            light="bg-zinc-200 border-r border-zinc-300",
+            dark="bg-zinc-800 border-r border-zinc-700",
+        ),
     )
 
 
@@ -979,10 +1002,14 @@ def task_box(task: TaskRender, date_range: DateRange):
         on_mouse_out=TooltipState.hide_tooltip,  # type:ignore
         position="absolute",
         left=f"{start_percent}%",
-        height="20px",
+        height="100%",
         width=f"{width_percent}%",
-        background_color="#5b279c",
         border_radius="3px",
+        class_name="my-auto bg-gradient-to-r shadow-sm "  # type:ignore
+        + rx.color_mode_cond(
+            light="from-indigo-500 to-purple-400",
+            dark="from-indigo-400 to-purple-700",
+        ),
     )
 
 
@@ -994,8 +1021,8 @@ def task_row(task: TaskRender) -> rx.Component:
                 task_box(task, task.date_range),  # type: ignore
             ),
             position="relative",
-            height="40px",
             width="100%",
+            class_name="my-auto flex h-full",
         ),
         width="100%",
         padding_y="0.5rem",
@@ -1005,14 +1032,12 @@ def task_row(task: TaskRender) -> rx.Component:
 
 def task_name(task: Dict[str, Any]) -> rx.Component:
     """Task name box."""
-    status_color = get_status_color(str(task["status"]))
 
     return rx.box(
         rx.hstack(
             rx.box(
                 width="12px",
                 height="12px",
-                background_color=status_color,
                 border_radius="2px",
             ),
             rx.text(
