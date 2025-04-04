@@ -269,11 +269,16 @@ class State(rx.State):
                 name=task.name,
                 description=task.description,
                 status_id=task.status_id,
-                milestone_id=None,
+                milestone_id=milestone_id,
                 start_date=task.start_date,
                 end_date=task.end_date,
             )
             self.data.statuses_by_id[status_id].task_ids.append(task.id)
+
+            if milestone_id is not None:
+                self.data.milestones_by_id[milestone_id].task_ids.append(
+                    task.id
+                )
 
             return [
                 rx.toast.success(
