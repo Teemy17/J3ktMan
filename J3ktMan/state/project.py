@@ -9,9 +9,11 @@ from J3ktMan.crud.project import (
     is_in_project,
 )
 from J3ktMan.crud.tasks import (
+    ExistingMilestoneNameError,
     ExistingStatusNameError,
     ExistingTaskNameError,
     MilestoneCreate,
+    DateError,
     assign_milestone,
     create_milestone,
     create_status,
@@ -25,6 +27,7 @@ from J3ktMan.crud.tasks import (
     rename_task,
     set_status,
     set_task_description,
+    update_task_dates,
 )
 from J3ktMan.model.tasks import Priority
 
@@ -35,6 +38,8 @@ class Task(rx.Base):
     description: str
     status_id: int
     milestone_id: int | None
+    start_date: int | None
+    end_date: int | None
 
 
 class Status(rx.Base):
@@ -48,6 +53,7 @@ class Milestone(rx.Base):
     id: int
     name: str
     description: str
+    task_ids: list[int]
 
 
 class Data(rx.Base):
@@ -60,7 +66,7 @@ class Data(rx.Base):
 
 class State(rx.State):
     """
-    This state fetches all the data needed to display the project page. It waas
+    This state fetches all the data needed to display the project page. It was
     meant to be used in pages that uses the project information.
     """
 
@@ -93,6 +99,15 @@ class State(rx.State):
                     ),
                 ]
 
+            milestones = get_milestones_by_project_id(project_id)
+            for milestone in milestones:
+                milestones_by_id[milestone.id] = Milestone(
+                    id=milestone.id,
+                    name=milestone.name,
+                    description=milestone.description,
+                    task_ids=[],
+                )
+
             statuses = get_statuses_by_project_id(project_id)
             for status in statuses:
                 statuses_by_id[status.id] = Status(
@@ -105,24 +120,22 @@ class State(rx.State):
                 tasks = get_tasks_by_status_id(status.id)
 
                 for task in tasks:
-
                     tasks_by_id[task.id] = Task(
                         id=task.id,
                         name=task.name,
                         description=task.description,
                         status_id=task.status_id,
                         milestone_id=task.milestone_id,
+                        start_date=task.start_date,
+                        end_date=task.end_date,
                     )
 
                     statuses_by_id[status.id].task_ids.append(task.id)
 
-            milestones = get_milestones_by_project_id(project_id)
-            for milestone in milestones:
-                milestones_by_id[milestone.id] = Milestone(
-                    id=milestone.id,
-                    name=milestone.name,
-                    description=milestone.description,
-                )
+                    if task.milestone_id is not None:
+                        milestones_by_id[task.milestone_id].task_ids.append(
+                            task.id
+                        )
 
             new_page_data = Data(
                 project_id=project_id,
@@ -184,6 +197,16 @@ class State(rx.State):
 
         return list(self.data.statuses_by_id.values())
 
+    def tasks(self) -> dict[int, Task]:
+        """
+        Returns the dict of tasks.
+        """
+
+        if self.data is None:
+            return {}
+
+        return self.data.tasks_by_id
+
     @rx.event
     def create_status(self, status_name: str) -> list[EventSpec] | None:
         if self.data is None:
@@ -216,7 +239,14 @@ class State(rx.State):
 
     @rx.event
     def create_task(
-        self, name: str, description: str, priority: Priority, status_id: int
+        self,
+        name: str,
+        description: str,
+        priority: Priority,
+        status_id: int,
+        milestone_id: int | None,
+        start_date: int | None = None,
+        end_date: int | None = None,
     ) -> list[EventSpec] | None:
 
         if self.data is None:
@@ -224,16 +254,31 @@ class State(rx.State):
 
         try:
             # create task
-            task = create_task(name, description, priority, status_id)
+            task = create_task(
+                name,
+                description,
+                priority,
+                status_id,
+                milestone_id,
+                start_date,
+                end_date,
+            )
 
             self.data.tasks_by_id[task.id] = Task(
                 id=task.id,
                 name=task.name,
                 description=task.description,
                 status_id=task.status_id,
-                milestone_id=None,
+                milestone_id=milestone_id,
+                start_date=task.start_date,
+                end_date=task.end_date,
             )
             self.data.statuses_by_id[status_id].task_ids.append(task.id)
+
+            if milestone_id is not None:
+                self.data.milestones_by_id[milestone_id].task_ids.append(
+                    task.id
+                )
 
             return [
                 rx.toast.success(
@@ -246,6 +291,14 @@ class State(rx.State):
             return [
                 rx.toast.error(
                     f'Task "{name}" already exists',
+                    position="top-center",
+                )
+            ]
+
+        except DateError:
+            return [
+                rx.toast.error(
+                    "Invalid date range",
                     position="top-center",
                 )
             ]
@@ -311,6 +364,7 @@ class State(rx.State):
                 id=milestone.id,
                 name=milestone.name,
                 description=milestone.description,
+                task_ids=[],
             )
 
             return [
@@ -320,7 +374,7 @@ class State(rx.State):
                 )
             ]
 
-        except ExistingStatusNameError:
+        except ExistingMilestoneNameError:
             return [
                 rx.toast.error(
                     f'Milestone "{name}" already exists',
@@ -364,10 +418,21 @@ class State(rx.State):
         if self.data is None:
             return
 
+        old_milestone_id = self.data.tasks_by_id[task_id].milestone_id
         assign_milestone(milestone_id, task_id)
 
         # update task in state
+
+        if old_milestone_id is not None:
+            self.data.milestones_by_id[old_milestone_id].task_ids.remove(
+                task_id
+            )
+
         self.data.tasks_by_id[task_id].milestone_id = milestone_id
+
+        if milestone_id is not None:
+            self.data.milestones_by_id[milestone_id].task_ids.append(task_id)
+
         task_name = self.data.tasks_by_id[task_id].name
 
         message = (
@@ -395,6 +460,11 @@ class State(rx.State):
         self.data.statuses_by_id[deleted_task.status_id].task_ids.remove(
             deleted_task.id
         )
+
+        if deleted_task.milestone_id is not None:
+            self.data.milestones_by_id[
+                deleted_task.milestone_id
+            ].task_ids.remove(task_id)
 
         return [
             rx.toast.success(
@@ -446,3 +516,67 @@ class State(rx.State):
                 position="top-center",
             )
         ]
+
+    @rx.event
+    def change_task_dates(
+        self,
+        task_id: int,
+        start_date: int | None = None,
+        end_date: int | None = None,
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+        try:
+            update_task_dates(task_id, start_date, end_date)
+            task = self.data.tasks_by_id[task_id]
+            task.start_date = start_date
+            task.end_date = end_date
+
+            return [
+                rx.toast.success(
+                    f'Task "{task.name}" dates have been updated',
+                    position="top-center",
+                )
+            ]
+        except DateError:
+            return [
+                rx.toast.error(
+                    "Invalid date range",
+                    position="top-center",
+                )
+            ]
+
+    @rx.event
+    def edit_task(
+        self,
+        task_id: int,
+        name: str,
+        description: str,
+        start_date: int | None = None,
+        end_date: int | None = None,
+    ) -> list[EventSpec] | None:
+        if self.data is None:
+            return
+
+        try:
+            task = rename_task(task_id, name)
+            task.description = description
+            update_task_dates(task_id, start_date, end_date)
+            self.data.tasks_by_id[task_id].name = task.name
+            self.data.tasks_by_id[task_id].description = task.description
+            self.data.tasks_by_id[task_id].start_date = start_date
+            self.data.tasks_by_id[task_id].end_date = end_date
+
+            return [
+                rx.toast.success(
+                    f'Task "{name}" has been updated',
+                    position="top-center",
+                )
+            ]
+        except ExistingTaskNameError:
+            return [
+                rx.toast.error(
+                    f'Task with name"{name}" already exists',
+                    position="top-center",
+                )
+            ]

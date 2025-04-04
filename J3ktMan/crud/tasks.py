@@ -33,6 +33,10 @@ class MilestoneAlreadyAssignedError(Exception):
     pass
 
 
+class DateError(Exception):
+    pass
+
+
 class MilestoneCreate(rx.Base):
     name: str
     description: str
@@ -230,6 +234,9 @@ def create_task(
     description: str,
     priority: Priority,
     status_id: int,
+    milestone_id: int | None,
+    start_date: int | None = None,
+    end_date: int | None = None,
 ) -> Task:
     """
     Creates a task in the given milestone ID.
@@ -258,14 +265,18 @@ def create_task(
         if task is not None:
             raise ExistingTaskNameError()
 
+        if end_date is not None and start_date is not None:
+            if start_date > end_date:
+                raise DateError()
+
         new_task = Task(
             name=name,
             description=description,
-            milestone_id=None,
+            milestone_id=milestone_id,
             priority=priority,
             status_id=status_id,
-            start_date=None,
-            end_date=None,
+            start_date=start_date,
+            end_date=end_date,
         )
 
         session.add(new_task)
@@ -274,6 +285,37 @@ def create_task(
         session.refresh(new_task)
 
         return new_task
+
+
+def update_task_dates(
+    task_id: int,
+    start_date: int | None = None,
+    end_date: int | None = None,
+) -> Task:
+    """
+    Updates the start and end dates of a task.
+
+    Chechs:
+    - If the task exists
+    - If the start date is before the end date
+    """
+    with rx.session() as session:
+        task = session.exec(Task.select().where(Task.id == task_id)).first()
+        if task is None:
+            raise InvalidTaskIDError()
+
+        if start_date is not None and end_date is not None:
+            if start_date > end_date:
+                raise DateError()
+
+        task.start_date = start_date
+        task.end_date = end_date
+
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        return task
 
 
 def get_task_by_id(task_id: int) -> Task | None:

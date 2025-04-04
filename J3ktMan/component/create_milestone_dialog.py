@@ -11,7 +11,7 @@ class State(rx.State):
         description = str(form["description"])
 
         state = await self.get_state(ProjectState)
-        return state.create_milestone(name, description)
+        return state.create_milestone(name, description)  # type: ignore
 
 
 def form_field(
