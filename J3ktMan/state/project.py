@@ -456,6 +456,11 @@ class State(rx.State):
             deleted_task.id
         )
 
+        if deleted_task.milestone_id is not None:
+            self.data.milestones_by_id[
+                deleted_task.milestone_id
+            ].task_ids.remove(task_id)
+
         return [
             rx.toast.success(
                 f'Task "{deleted_task.name}" has been deleted',
