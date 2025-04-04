@@ -791,18 +791,23 @@ def timeline_view() -> rx.Component:
                         render_task_name(),
                         # Create new milestone button in the last row
                         create_milestone_dialog(
-                            trigger=rx.button(
-                                rx.hstack(
-                                    rx.icon(tag="plus", class_name="my-auto"),
-                                    rx.text(
-                                        "Create New Milestone",
-                                        class_name="my-auto",
+                            trigger=rx.box(
+                                rx.button(
+                                    rx.hstack(
+                                        rx.icon(
+                                            tag="plus", class_name="my-auto"
+                                        ),
+                                        rx.text(
+                                            "Create New Milestone",
+                                            class_name="my-auto",
+                                        ),
+                                        class_name="flex",
                                     ),
-                                    class_name="flex",
+                                    variant="soft",
+                                    color_scheme="indigo",
+                                    width="100%",
                                 ),
-                                width="100%",
-                                variant="soft",
-                                color_scheme="indigo",
+                                class_name="p-4",
                             )
                         ),
                         width="400px",
@@ -868,7 +873,7 @@ def month_header(month: str, width: str) -> rx.Component:
         ),
         width=width,
         height="40px",
-        class_name="flex my-auto " # type: ignore
+        class_name="flex my-auto "  # type: ignore
         + rx.color_mode_cond(
             light="bg-zinc-200 border-r border-zinc-300",
             dark="bg-zinc-800 border-r border-zinc-700",
