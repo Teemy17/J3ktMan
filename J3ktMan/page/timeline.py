@@ -9,7 +9,7 @@ import J3ktMan.model.project
 from J3ktMan.component import base
 from J3ktMan.component.create_milestone_dialog import create_milestone_dialog
 from J3ktMan.component.protected import protected_page_with
-from J3ktMan.component.task_dialog import task_dialog 
+from J3ktMan.component.task_dialog import task_dialog
 from J3ktMan.component.create_task_dialog import create_task_dialog
 from J3ktMan.state.project import (
     State as ProjectState,
@@ -602,18 +602,23 @@ def render_task_name():
 
         return rx.vstack(
             rx.hstack(
-                rx.icon(
+                rx.button(
                     # tag="chevron-right" if not is_expanded else "chevron-down",
-                    tag=rx.cond(
-                        is_expanded,
-                        "chevron-down",
-                        "chevron-right",
+                    rx.icon(
+                        rx.cond(
+                            is_expanded,
+                            "chevron-down",
+                            "chevron-right",
+                        ),
+                        size=1,
                     ),
                     on_click=lambda: TimelineState.toggle_milestone(
                         milestone.id  # type:ignore
                     ),
                     cursor="pointer",
                     margin_right="0.5rem",
+                    variant="ghost",
+                    color_scheme="gray",
                 ),
                 rx.text(
                     milestone.name,
@@ -656,6 +661,7 @@ def render_task_name():
                                                 color="#eee",
                                                 font_size="14px",
                                                 font_weight="medium",
+                                                class_name="line-clamp-1",
                                             ),
                                             width="100%",
                                             align_items="center",
@@ -670,7 +676,7 @@ def render_task_name():
                             class_name="my-auto",
                             width="100%",
                         ),
-                        padding_left="1.5rem",
+                        padding_left="2rem",
                         height="40px",
                         class_name="flex",
                     ),
