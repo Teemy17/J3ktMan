@@ -11,7 +11,13 @@ class State(rx.State):
 
 def logo() -> rx.Component:
     return rx.hstack(
-        rx.text("J3ktMan", size="7", weight="bold"),
+        rx.text(
+            "J3ktMan",
+            size="7",
+            weight="bold",
+            on_click=rx.redirect("/home"),
+            style={"cursor": "pointer"},  # type: ignore
+        ),
     )
 
 
@@ -84,7 +90,7 @@ def user_profile() -> rx.Component:
                 rx.avatar(
                     name="Anima Agrawal",
                     size="3",
-                    src="https://via.placeholder.com/40",
+                    src=clerk.ClerkState.user.image_url,  # type: ignore
                     border_radius="full",
                 ),
                 rx.vstack(
@@ -105,7 +111,7 @@ def user_profile() -> rx.Component:
             ),
         ),
         rx.menu.content(
-            rx.menu.item("Profile"),
+            rx.menu.item("Profile", on_click=rx.redirect("/profile")),
             rx.menu.item("Settings"),
             rx.menu.separator(),
             rx.menu.item("Log out", on_click=State.show_logout),  # type: ignore

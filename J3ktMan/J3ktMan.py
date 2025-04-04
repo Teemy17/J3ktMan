@@ -10,6 +10,7 @@ from J3ktMan.page.signin import signin
 from J3ktMan.page.timeline import timeline_view
 from J3ktMan.page.home import home
 from J3ktMan.page.dashboard import dashboard
+from J3ktMan.page.profile import profile
 
 
 # the following import is necessary to register the model with the database
@@ -25,6 +26,7 @@ app.add_page(signin, route="signin/[[...slug]]")
 app.add_page(signup, route="signup/[[...slug]]")
 app.add_page(home)
 app.add_page(dashboard)
+app.add_page(profile)
 
 app.add_page(join_project)
 app.add_page(timeline_view)
