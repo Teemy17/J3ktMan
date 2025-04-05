@@ -44,13 +44,10 @@ class State(rx.State):
         if not isinstance(self.project, InvitedPorject):
             return None
 
-        success = reedem_invitation_code(
-            self.project.code, clerk_state.user_id
-        )
+        success = reedem_invitation_code(self.project.code, clerk_state.user_id)
 
         if success:
-            # TODO: redirect to the project page or something
-            return [rx.redirect("/")]
+            return [rx.redirect("/home")]
         else:
             return rx.toast.error(
                 "Can't join the project; the invitation code might've been expired"
@@ -58,7 +55,7 @@ class State(rx.State):
 
     @rx.event
     def back(self) -> EventSpec:
-        return rx.redirect("/")
+        return rx.redirect("/home")
 
     @rx.event
     def on_load(self) -> None:
@@ -75,9 +72,7 @@ class State(rx.State):
             self.project = InvalidCode()
             return
 
-        self.project = InvitedPorject(
-            id=project.id, name=project.name, code=code
-        )
+        self.project = InvitedPorject(id=project.id, name=project.name, code=code)
 
         # TODO: add some check whether the user has already join this project
 
@@ -95,9 +90,7 @@ def join_project() -> rx.Component:
                             rx.icon("triangle-alert", size=60),
                             rx.icon("circle-check", size=60),
                         ),
-                        color_scheme=rx.cond(
-                            State.invalid_code, "red", "mint"
-                        ),
+                        color_scheme=rx.cond(State.invalid_code, "red", "mint"),
                         padding="0.65rem",
                         class_name="rounded-xl text-2xl shadow-md",
                     ),
@@ -105,9 +98,7 @@ def join_project() -> rx.Component:
                         State.invalid_code,
                         rx.vstack(
                             rx.heading("Invalid Code", size="4"),
-                            rx.text(
-                                "Your code might have been expired.", size="2"
-                            ),
+                            rx.text("Your code might have been expired.", size="2"),
                             align="center",
                             margin_y="1rem",
                         ),
@@ -127,10 +118,10 @@ def join_project() -> rx.Component:
                             "Back to Home",
                             width="100%",
                             class_name="""
-                                shadow-md bg-transparent text-slate-500 border 
+                                shadow-md bg-transparent text-slate-500 border
                                 rounded-md border-solid border-slate-100
-                                hover:bg-slate-100 hover:text-slate-700 
-                                dark:text-slate-200 dark:border-slate-600  
+                                hover:bg-slate-100 hover:text-slate-700
+                                dark:text-slate-200 dark:border-slate-600
                                 dark:hover:bg-slate-600 dark:hover:text-slate-200
                             """,
                             on_click=State.back,
@@ -146,12 +137,12 @@ def join_project() -> rx.Component:
                                 "Decline",
                                 width="100%",
                                 class_name="""
-                                    shadow-md bg-transparent text-slate-500 
-                                    border rounded-md border-solid 
-                                    border-slate-100 hover:bg-slate-100 
+                                    shadow-md bg-transparent text-slate-500
+                                    border rounded-md border-solid
+                                    border-slate-100 hover:bg-slate-100
                                     hover:text-slate-700 dark:text-slate-200
-                                    dark:border-slate-600  
-                                    dark:hover:bg-slate-600 
+                                    dark:border-slate-600
+                                    dark:hover:bg-slate-600
                                     dark:hover:text-slate-200
                                 """,
                                 on_click=State.back,
