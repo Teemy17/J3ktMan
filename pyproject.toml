@@ -1,0 +1,24 @@
+[project]
+dependencies = [
+    "reflex==0.7.3",
+    "reflex-clerk @ git+https://github.com/Simmypeet/reflex-clerk@a596d5b40b1045b217a92287fedfa37c1d81aca2",
+    "authlib==1.3.2",
+    "python-dotenv==1.0.1",
+    "psycopg2-binary==2.9.10",
+    "pandas==2.2.3",
+]
+name = "J3ktMan"
+version = "0.0.1"
+description = "J3ktMan"
+requires-python = ">=3.12"
+
+[tool.setuptools]
+py-modules = []
+
+# Black formatter
+[tool.black]
+line-length = 79
+
+# Pyright linter
+[tool.pyright]
+typeCheckingMode = "standard"

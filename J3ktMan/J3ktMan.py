@@ -2,38 +2,32 @@
 
 import reflex as rx
 
-from rxconfig import config
+from J3ktMan.page.index import index
+from J3ktMan.page.join_project import join_project
+from J3ktMan.page.kanban import kanban
+from J3ktMan.page.members import member_page
+from J3ktMan.page.signup import signup
+from J3ktMan.page.signin import signin
+from J3ktMan.page.timeline import timeline_view
+from J3ktMan.page.home import home
+from J3ktMan.page.dashboard import dashboard
 
 
-class State(rx.State):
-    """The app state."""
-
-    ...
-
-
-def index() -> rx.Component:
-    # Welcome Page (Index)
-    return rx.container(
-        rx.color_mode.button(position="top-right"),
-        rx.vstack(
-            rx.heading("Welcome to Reflex!", size="9"),
-            rx.text(
-                "Get started by editing ",
-                rx.code(f"{config.app_name}/{config.app_name}.py"),
-                size="5",
-            ),
-            rx.link(
-                rx.button("Check out our docs!"),
-                href="https://reflex.dev/docs/getting-started/introduction/",
-                is_external=True,
-            ),
-            spacing="5",
-            justify="center",
-            min_height="85vh",
-        ),
-        rx.logo(),
-    )
+# the following import is necessary to register the model with the database
+from J3ktMan.model import project  # noqa
 
 
 app = rx.App()
+
 app.add_page(index)
+
+# for some reason, the @rx.page(route="...") decorator doesn't work so the route is added manually here :(
+app.add_page(signin, route="signin/[[...slug]]")
+app.add_page(signup, route="signup/[[...slug]]")
+app.add_page(home)
+app.add_page(dashboard)
+app.add_page(member_page)
+
+app.add_page(join_project)
+app.add_page(timeline_view)
+app.add_page(kanban)
